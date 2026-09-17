@@ -1,0 +1,15 @@
+.env
+__pycache__/
+
+# Entorno virtual de Python -- se recrea con
+# "python -m venv venv && pip install -r requirements.txt", no tiene
+# sentido (ni conviene, puede pesar cientos de MB) subirlo al repo.
+# Agregado ahora porque no estaba: si "venv" ya se había subido alguna vez
+# sin querer, agregarlo acá no lo saca solo del repo -- hay que además
+# correr "git rm -r --cached venv" una vez (ver guía).
+venv/
+
+# Imágenes de productos subidas desde el panel admin (ver
+# POST /api/v1/productos/imagenes). Contenido generado en runtime, no
+# código -- no se versiona.
+storage/

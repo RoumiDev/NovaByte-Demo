@@ -1,0 +1,6 @@
+/* Este archivo quedó en desuso -- ya no se importa desde main.jsx. Todo lo
+   que tenía (colores, .pantalla-centrada, .sidebar-admin) se movió a
+   src/styles/theme.scss, junto con la paleta de colores, tipografía y
+   bordes de toda la app, para que el estilo viva en un solo lugar. Se deja
+   este archivo vacío en vez de borrarlo para no dejar un import roto si
+   algo todavía lo referencia. */

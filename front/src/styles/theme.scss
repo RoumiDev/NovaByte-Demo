@@ -1,0 +1,1016 @@
+// =============================================================================
+// TEMA DE LA APP — este es el archivo que hay que editar para cambiar el
+// "look" de LT Informática entera: colores, tipografía, bordes, sombras.
+//
+// Cómo funciona: en vez de parchear el CSS ya compilado de Bootstrap (frágil
+// -- muchos componentes como .btn-primary tienen sus colores escritos
+// directo, no como variable), acá se recompila Bootstrap desde su propia
+// fuente Sass con nuestras variables. Todo lo que en el código React ya usa
+// variant="primary", bg="secondary", bg="dark", etc. (botones, badges,
+// navbars, formularios, alerts...) sale de las variables de acá abajo --
+// no hay que tocar ningún componente para que el cambio se vea en toda la
+// app.
+//
+// Para cambiar el color de marca: editá $primary (y de paso $dark, que hoy
+// es una variante bien oscura del mismo violeta -- se usa en los navbars
+// bg="dark" de SiteNavbar/AdminLayout). Para cambiar la tipografía: editá
+// $font-family-sans-serif (las fuentes Nunito Sans se importan en main.jsx).
+// =============================================================================
+
+// Funciones de Bootstrap primero (tint-color, shade-color, etc. -- las
+// variables de acá abajo las necesitan).
+@import "bootstrap/scss/functions";
+
+// -----------------------------------------------------------------------
+// 1. PALETA DE COLORES -- rediseño en base a la referencia visual "Tech
+// Direct" que pasó el cliente (fondo azul marino oscuro, acentos naranja,
+// tarjetas claras redondeadas). El naranja ($primary) es el mismo que ya
+// usa el favicon (public/favicon.ico) para mantener la marca consistente.
+// -----------------------------------------------------------------------
+// DEMO (16/09/2026): paleta temporal solo para la copia de demo usada en
+// capturas promocionales -- teal en vez del naranja de marca real, para
+// que estas imágenes se distingan claramente de la app de producción. No
+// tocar la app real: esto vive únicamente en la carpeta de demo aislada.
+$primary:   #0d9488; // teal -- color de marca del demo. Botones, links, foco de formularios, badges "primary" salen de acá.
+$secondary: #64748b; // gris azulado, para lo que hoy usás variant="secondary" (ej. "Sin stock", "Cerrar sesión")
+$success:   #059669; // ej. pedido "pagado"
+$info:      #0284c7; // ej. pedido "enviado"
+$warning:   #f59e0b; // ej. pedido "pendiente"
+$danger:    #e11d48; // ej. errores, pedido "cancelado"
+$light:     #f5f6f8;
+$dark:      #132a2e; // verde azulado oscuro -- lo ven los navbars con bg="dark" (SiteNavbar, AdminLayout)
+
+$body-bg:    $light;
+$body-color: #1e2733;
+
+// Modo claro: los grises neutros que trae Bootstrap por defecto
+// (body-secondary-bg/body-tertiary-bg) quedan fríos al lado de $light --
+// estos dos tokens son los que ya usan .superficie/.producto-card/
+// dropdowns/tablas vía var(--bs-secondary-bg)/var(--bs-tertiary-bg), así
+// que ajustarlos acá alcanza para toda la app sin tocar ningún componente.
+$body-secondary-bg: #eef1f4;
+$body-tertiary-bg:  #ffffff;
+
+// Modo oscuro (auditoría UX/UI 30/08/2026, pedido del cliente: "un diseño
+// atractivo, moderno, elegante... tanto para la versión oscura y clara").
+// Hasta acá la app no declaraba NINGUNA variable *-dark de Bootstrap, así
+// que data-bs-theme="dark" caía en los grises genéricos por defecto
+// (gray-900/800/700) -- una paleta sin ninguna relación con el azul marino
+// de marca ($dark, #1e2733, el mismo que ya usan los navbars). Estos son la
+// versión oscura de la MISMA paleta de arriba (mismo tinte azulado que
+// $dark), no grises neutros -- Bootstrap las aplica solo cuando
+// data-bs-theme="dark" (ver $color-mode-type más abajo, ya es "data" por
+// defecto), nada que tocar en React.
+$body-bg-dark:                  #121822;
+$body-color-dark:               #e7ecf2;
+$body-secondary-bg-dark:        #19212c;
+$body-tertiary-bg-dark:         #212b38;
+$border-color-dark:             #2b3646;
+$border-color-translucent-dark: rgba(255, 255, 255, 0.08);
+
+// -----------------------------------------------------------------------
+// 2. TIPOGRAFÍA
+// -----------------------------------------------------------------------
+$font-family-sans-serif: "Nunito Sans", system-ui, -apple-system, "Segoe UI", Roboto, Arial, sans-serif;
+// Redisño 30/08/2026: 600 → 700 -- títulos con más peso y presencia,
+// pedido del cliente de un look "atractivo, moderno, elegante".
+$headings-font-weight: 700;
+$btn-font-weight: 600;
+
+// -----------------------------------------------------------------------
+// 3. BORDES Y SOMBRAS -- look moderno: cantos más redondeados, sombras
+// suaves en vez de bordes duros marcados.
+//
+// Rediseño 30/08/2026 (pedido del cliente, "diseño atractivo, moderno,
+// elegante"): escala de radios un escalón más grande que antes -- las
+// tarjetas/paneles se sienten más suaves/contemporáneas. Además $btn-*/
+// $badge-border-radius (más abajo) pasan a $border-radius-pill: botones y
+// badges redondeados de punta a punta en vez de esquinas apenas curvas --
+// es el cambio que más se nota de un vistazo en toda la app, ya que
+// aparece en CADA botón/badge sin tocar un solo componente.
+$border-radius:      0.75rem;
+$border-radius-sm:   0.55rem;
+$border-radius-lg:   1rem;
+$border-radius-xl:   1.5rem;
+
+// 50rem a mano (no $border-radius-pill): esa variable la define Bootstrap
+// más abajo, recién cuando se importa bootstrap/scss/variables dentro de
+// bootstrap/scss/bootstrap -- acá arriba, antes de ese @import, todavía no
+// existe. Es el mismo valor exacto que Bootstrap le da por defecto.
+$btn-border-radius:    50rem;
+$btn-border-radius-sm: 50rem;
+$btn-border-radius-lg: 50rem;
+$badge-border-radius:  50rem;
+
+$box-shadow-sm: 0 1px 3px rgba(30, 39, 51, 0.08);
+$box-shadow:    0 8px 24px rgba(30, 39, 51, 0.10);
+$box-shadow-lg: 0 16px 40px rgba(30, 39, 51, 0.14);
+
+// Cards sin borde duro -- se apoyan en la sombra (shadow-sm) que ya usan
+// Catalogo/Carrito/Home/ResultadoPago para "flotar" en vez de recuadrarse.
+$card-border-width: 0;
+
+// Auditoría UX/UI 30/08/2026: $btn-transition por defecto no anima
+// "transform" -- hace falta para el levante sutil que se agrega más abajo
+// (sección EXTRAS, .btn:hover) sin que la animación quede solo en el color/
+// sombra y el botón "salte" de golpe.
+$btn-transition: color .15s ease-in-out, background-color .15s ease-in-out,
+  border-color .15s ease-in-out, box-shadow .15s ease-in-out, transform .15s ease-in-out;
+
+// El gris neutro que trae Bootstrap por defecto para filas de tabla en
+// hover no tiene relación con la marca -- un tinte naranja bien tenue,
+// mismo espíritu que el resto de los estados "hover" de la app
+// (.producto-card, más abajo).
+$table-hover-bg: rgba($primary, 0.06);
+
+// FIX UX-A4 (auditoría UX/UI 12/09/2026, Punto Crítico #4 "Alto"): Bootstrap
+// usa $primary tal cual como $link-color si no se pisa -- eso es lo que
+// pinta, por ejemplo, los headers de categoría del mega-menú de Catálogo
+// (CatalogoMegaMenu.jsx, son <button class="btn btn-link ...">, que toman
+// color de $link-color) y cualquier otro link/.btn-link de la app en modo
+// claro. #f37021 sobre blanco/$light da ~2.9:1 de contraste -- no llega al
+// 4.5:1 mínimo de WCAG AA para texto normal.
+//
+// shade-color($primary, 28%) (mezcla con negro, la misma función que ya usa
+// Bootstrap para sus variantes -- ver .btn-primary más abajo) da ~5.2:1
+// sobre blanco y ~4.8:1 sobre $light: sigue siendo un naranja de marca
+// reconocible, ahora legible como texto. Esto SOLO cambia el color de
+// link/texto -- $primary en sí (botones, badges, bordes, sombras, foco de
+// formularios) no se toca.
+//
+// En modo oscuro no hace falta ningún ajuste: Bootstrap ya usa
+// tint-color($primary, 40%) como $link-color-dark por defecto (más claro,
+// para contrastar con fondos oscuros), que da ~7-9:1 sobre los fondos
+// oscuros de esta app -- de sobra.
+//
+// FIX (13/09/2026, auditoría UX/UI Punto Crítico #5): este mismo shade se
+// reutiliza más abajo (sección EXTRAS, .sidebar-admin/.sidebar-tienda
+// .nav-link.active) para el caso INVERSO -- fondo naranja con texto
+// blanco encima, en vez de texto naranja sobre fondo claro. El contraste
+// es una relación simétrica entre las dos luminancias, así que el mismo
+// ~5.2:1 ya verificado acá arriba aplica igual de bien ahí: no hace falta
+// recalcular nada, y $primary sigue sin tocarse en ningún otro lado
+// (botones, badges, bordes, foco de formularios). De acá el nombre
+// genérico ("accesible", no "link") -- si en el futuro aparece un tercer
+// lugar con este mismo problema (texto blanco/oscuro que necesite más
+// contraste que el $primary plano), reusar esta variable en vez de
+// definir un shade nuevo.
+$primary-shade-accesible: shade-color($primary, 28%);
+$link-color: $primary-shade-accesible;
+$link-hover-color: shade-color($primary, 38%);
+
+// -----------------------------------------------------------------------
+// Resto de Bootstrap, con las variables de arriba ya aplicadas.
+// -----------------------------------------------------------------------
+@import "bootstrap/scss/bootstrap";
+
+// =============================================================================
+// EXTRAS propios de la app -- lo que no es una variable de Bootstrap.
+// Antes vivía en index.css; se unificó acá para que todo el estilo quede
+// en un solo lugar.
+// =============================================================================
+
+html {
+  scroll-behavior: smooth;
+  // Auditoría UX/UI 30/08/2026: scrollbar fina, theme-aware (mismo
+  // var(--bs-border-color) que ya recalcula Bootstrap solo por
+  // data-bs-theme) en vez de la scrollbar gris ancha del sistema
+  // operativo. Esta propiedad la toma Firefox -- el bloque
+  // ::-webkit-scrollbar de acá abajo cubre Chrome/Edge/Safari.
+  scrollbar-width: thin;
+  scrollbar-color: var(--bs-border-color) transparent;
+}
+
+*::-webkit-scrollbar {
+  width: 10px;
+  height: 10px;
+}
+
+*::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+*::-webkit-scrollbar-thumb {
+  background-color: var(--bs-border-color);
+  border-radius: 999px;
+  border: 2px solid var(--bs-body-bg);
+}
+
+*::-webkit-scrollbar-thumb:hover {
+  background-color: var(--bs-secondary-color);
+}
+
+// Selección de texto con un toque de naranja de marca en vez del azul
+// genérico del navegador -- mismo criterio "detalles en naranja" del resto
+// del rediseño (auditoría UX/UI 30/08/2026).
+::selection {
+  background-color: rgba($primary, 0.28);
+  color: var(--bs-body-color);
+}
+
+// Auditoría UX/UI 30/08/2026: levante sutil + brillo ambiente naranja al
+// pasar el mouse por un botón -- mismo lenguaje visual que ya usa
+// .producto-card más abajo (translateY + sombra difusa en $primary), acá
+// aplicado a los botones en general para
+// que la app se sienta coherente de punta a punta. Bootstrap ya resuelve el
+// color de cada variant -- esto solo agrega movimiento y sombra, no toca
+// ningún color.
+.btn:not(.btn-link):not(:disabled):not(.disabled) {
+  transition: $btn-transition;
+}
+
+.btn:not(.btn-link):not(:disabled):not(.disabled):hover {
+  transform: translateY(-1px);
+}
+
+.btn-primary:not(:disabled):not(.disabled):hover,
+.btn-primary:not(:disabled):not(.disabled):focus-visible {
+  box-shadow: 0 4px 14px rgba($primary, 0.35);
+}
+
+.btn-outline-primary:not(:disabled):not(.disabled):hover,
+.btn-outline-primary:not(:disabled):not(.disabled):focus-visible {
+  box-shadow: 0 4px 14px rgba($primary, 0.22);
+}
+
+// Rediseño 30/08/2026: botón primario con un degradé sutil (no un naranja
+// plano) + sombra de reposo -- se nota apenas se carga la pantalla, no
+// solo al pasar el mouse. shift-color() es la misma función que usa
+// Bootstrap internamente para sus variantes (tint-color/shade-color según
+// el signo) -- ya está disponible acá por el @import "bootstrap/scss/
+// functions" del principio del archivo.
+.btn-primary:not(:disabled):not(.disabled) {
+  background-image: linear-gradient(155deg, shift-color($primary, -10%) 0%, $primary 55%, shift-color($primary, 15%) 100%);
+  border-color: $primary;
+  box-shadow: 0 2px 10px rgba($primary, 0.28);
+}
+
+// Título de página con más presencia (h1/h2 -- no h3-h6, esos suelen ser
+// subtítulos/encabezados de sección más chicos donde este ajuste se vería
+// forzado): un poco menos de espaciado entre letras a ese tamaño se lee
+// más "editorial", y text-wrap: balance evita títulos largos con una
+// última línea desbalanceada de una sola palabra.
+h1, h2 {
+  letter-spacing: -0.01em;
+  text-wrap: balance;
+}
+
+// Resplandor ambiente naranja bien tenue, fijo en la esquina superior
+// izquierda de toda la página (no se mueve con el scroll) -- el mismo
+// recurso que ya usa .logo-brillo/.producto-card:hover en otras partes de
+// la app, acá a escala de fondo para darle profundidad al layout en vez de
+// quedar todo plano. Mismo valor en los dos temas: sobre el fondo oscuro
+// se ve como un brillo cálido; sobre el claro, apenas un tinte.
+body {
+  background-image: radial-gradient(circle at 12% -8%, rgba($primary, 0.16), transparent 55%);
+  background-repeat: no-repeat;
+  background-attachment: fixed;
+}
+
+// Barra naranja fina pegada al borde inferior del navbar (SiteNavbar/
+// AdminLayout, ambos bg="dark") + sombra propia -- separa visualmente el
+// navbar del contenido y refuerza el detalle de marca en naranja pedido
+// por el cliente, sin agregar ningún elemento nuevo al JSX.
+.navbar {
+  position: relative;
+  box-shadow: var(--bs-box-shadow-sm);
+}
+
+.navbar::after {
+  content: "";
+  position: absolute;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  height: 2px;
+  background: linear-gradient(90deg, transparent, rgba($primary, 0.85) 25%, rgba($primary, 0.85) 75%, transparent);
+}
+
+.pantalla-centrada {
+  min-height: 100vh;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 24px 0;
+}
+
+// Sidebar del panel admin (AdminLayout.jsx).
+.sidebar-admin {
+  min-height: calc(100vh - 56px);
+  border-right: 1px solid var(--bs-border-color);
+}
+
+.sidebar-admin .nav-link {
+  color: var(--bs-body-color);
+  border-radius: var(--bs-border-radius-sm);
+  margin-bottom: 2px;
+}
+
+// FIX (13/09/2026, auditoría UX/UI Punto Crítico #5): antes era
+// `background: var(--bs-primary)` -- #fff sobre $primary (#f37021) da
+// ~2.93:1 de contraste, por debajo del 4.5:1 mínimo de WCAG AA para texto
+// normal (mismo tipo de problema que $link-color más arriba, nunca
+// replicado acá). $primary-shade-accesible es ese mismo shade ya
+// verificado (~5.2:1) -- ver el comentario grande junto a su definición.
+// var(--bs-primary) no cambia entre temas, así que el problema (y el fix)
+// es el mismo en claro y oscuro.
+.sidebar-admin .nav-link.active {
+  background: $primary-shade-accesible;
+  color: #fff;
+}
+
+// SIN USO desde el 12/09/2026 (pedido del cliente: "pasar el contenido del
+// sidebar al navbar" -- ver el comentario grande en SiteLayout.jsx). Este
+// bloque y los tres de acá abajo (.contenido-tienda, .sidebar-tienda__
+// backdrop, .barra-superior-tienda) eran el mecanismo del sidebar overlay
+// que SiteLayout.jsx ya no arma -- no se borraron, mismo criterio que
+// AdminLayout.jsx/SiteNavbar.jsx (ver el comentario en App.jsx): quedan acá
+// por si hace falta revisar el comportamiento viejo, se pueden borrar a
+// mano cuando quieras, esta sesión no tiene forma de borrar archivos de tu
+// computadora.
+//
+// Sidebar de la tienda (SiteLayout.jsx, reemplaza al viejo SiteNavbar
+// horizontal): overlay (position: fixed) que se desliza por encima del
+// contenido en vez de empujarlo. Antes ocupaba su propio ancho dentro del
+// flex layout y corría el contenido de al lado al abrirse/cerrarse, pero
+// eso también corría de lugar cosas como el sidebar fijo de Configuración
+// (ver ConfiguracionLayout.jsx) -- ahora, sea cual sea la pantalla, abrir
+// o cerrar este sidebar nunca mueve nada de lugar, solo tapa/destapa la
+// esquina de arriba a la izquierda (con el contenido de atrás borroso
+// mientras tanto, ver .contenido-tienda más abajo). Necesita fondo propio
+// (antes no le hacía falta, era parte del flex layout) porque ahora queda
+// flotando arriba del resto.
+.sidebar-tienda {
+  position: fixed;
+  top: 0;
+  left: 0;
+  height: 100vh;
+  width: 250px;
+  border-right: 1px solid var(--bs-border-color);
+  background-color: var(--bs-body-bg);
+  z-index: 1030;
+  overflow-y: auto;
+  overflow-x: hidden;
+  transition: transform 0.2s ease;
+}
+
+.sidebar-tienda.sidebar-tienda--cerrada {
+  transform: translateX(-100%);
+  border-right: 0;
+}
+
+.sidebar-tienda .nav-link {
+  display: flex;
+  align-items: center;
+  gap: 0.65rem;
+  color: var(--bs-body-color);
+  border-radius: var(--bs-border-radius-sm);
+  margin-bottom: 2px;
+  white-space: nowrap;
+}
+
+// FIX (13/09/2026, auditoría UX/UI Punto Crítico #5): mismo problema y
+// mismo fix que .sidebar-admin .nav-link.active de más arriba -- ver ese
+// comentario y el de $primary-shade-accesible.
+.sidebar-tienda .nav-link.active {
+  background: $primary-shade-accesible;
+  color: #fff;
+}
+
+// Contenido a la derecha del sidebar de la tienda: mientras el sidebar
+// está abierto se difumina (pedido del cliente), para que el foco visual
+// quede en el menú. La barra con el botón de abrir/cerrar queda afuera de
+// este div (ver SiteLayout.jsx) a propósito, así el botón para volver a
+// cerrar el sidebar siempre se ve nítido, nunca borroso. No es un modal:
+// el contenido de atrás sigue siendo clickeable, nada más cambia
+// visualmente -- y como el sidebar ahora es un overlay (ver
+// .sidebar-tienda arriba), este contenido nunca se corre de lugar,
+// tampoco cuando adentro hay otro sidebar fijo (Configuración).
+.contenido-tienda {
+  transition: filter 0.2s ease;
+}
+
+.contenido-tienda.contenido-tienda--difuminado {
+  filter: blur(4px);
+}
+
+// FEATURE (30/08/2026, hallazgo Media-Alta #6 de la auditoría UX/UI):
+// backdrop invisible que solo aparece (en el JSX, ver SiteLayout.jsx)
+// mientras el sidebar está abierto -- cubre todo .contenido-tienda por
+// encima del Outlet (position: relative en el padre, ver arriba) e
+// intercepta cualquier click ahí, así el contenido borroso de atrás deja
+// de ser clickeable "por accidente" mientras el sidebar está abierto. Sin
+// fondo propio a propósito: el efecto visual de "atenuado" ya lo da el
+// blur de arriba, esto solo agrega el comportamiento de click-afuera-para-
+// cerrar (además de Escape, ver el useEffect en SiteLayout.jsx). z-index
+// bajo (no los 1030 del sidebar-tienda): solo necesita estar por encima
+// del contenido normal de la página, nunca por encima del sidebar en sí
+// ni de modales/dropdowns propios de Bootstrap (esos arrancan en 1050+).
+.sidebar-tienda__backdrop {
+  position: absolute;
+  inset: 0;
+  z-index: 5;
+  cursor: pointer;
+}
+
+// Barra de arriba de la tienda (botón abrir/cerrar sidebar): como el
+// sidebar ahora es un overlay que tapa la esquina de arriba a la
+// izquierda, esta barra se corre a la derecha del ancho del sidebar
+// mientras está abierto -- si no, el botón quedaría debajo del sidebar,
+// tapado. Es el único elemento que sí se mueve un poco a propósito: es
+// nada más la barra con el botón, no la página en sí (eso es lo que no
+// se quería que se corriera).
+.barra-superior-tienda {
+  transition: margin-left 0.2s ease;
+}
+
+.barra-superior-tienda.barra-superior-tienda--con-sidebar {
+  margin-left: 250px;
+}
+
+// Fondo/borde de "superficie": para paneles que tienen que distinguirse
+// del fondo de la página en los dos temas (antes algunos usaban bg-white
+// fijo, que en modo oscuro dejaba texto claro -- pensado para fondo
+// oscuro -- sobre un fondo blanco que no cambiaba, ilegible). Estas dos
+// variables ya las recalcula Bootstrap solo según data-bs-theme, así que
+// no hace falta mantener un color aparte por tema acá.
+.superficie {
+  background-color: var(--bs-tertiary-bg);
+  border: 1px solid var(--bs-border-color-translucent);
+}
+
+// Cards de producto (Catalogo.jsx/Home.jsx, vía GrillaProductos): fondo
+// propio + borde para que se note dónde termina la tarjeta y empieza el
+// fondo de la página (en modo oscuro ambos quedaban casi del mismo color
+// sin esto), más un pequeño levante y un brillo naranja al pasar el mouse
+// (mismo espíritu que .logo-brillo) para que se sientan clickeables.
+// position: relative + overflow: hidden porque de acá cuelga el ícono de
+// marca en marca de agua (.producto-card__marca-agua) -- tiene que
+// recortarse en el borde redondeado de la tarjeta, no salirse.
+.producto-card {
+  position: relative;
+  overflow: hidden;
+  background-color: var(--bs-tertiary-bg);
+  border: 1px solid var(--bs-border-color-translucent);
+  // Rediseño 30/08/2026: sombra de reposo (antes la tarjeta solo tenía
+  // sombra en :hover, más abajo) -- ahora se ve "elevada" del fondo de
+  // entrada, no plana, coherente con el resto de superficies flotantes de
+  // la app (.marca-destacada-slot).
+  box-shadow: var(--bs-box-shadow-sm);
+  transition: transform 0.15s ease, box-shadow 0.15s ease, border-color 0.15s ease;
+}
+
+.producto-card:hover {
+  transform: translateY(-2px);
+  border-color: rgba($primary, 0.55);
+  box-shadow: 0 0 0 1px rgba($primary, 0.35), 0 0 28px rgba($primary, 0.28), var(--bs-box-shadow) !important;
+}
+
+// FIX (13/09/2026, auditoría UX/UI Punto Alto #10, a pedido del cliente):
+// acá vivían .mega-menu-catalogo-panel/-columnas/-item, los estilos del
+// desplegable de categorías de CatalogoMegaMenu.jsx (FEATURE 12/09/2026).
+// Ese componente dejó de usarse -- "Catálogo" pasó a ser un link común en
+// SiteLayout.jsx, ver el comentario grande junto al <Navbar> ahí para el
+// detalle completo -- así que estas reglas quedaron sin ningún elemento
+// que las use. Se sacan de acá en vez de dejarlas de adorno (código CSS
+// muerto es tan fácil de perder de vista como el JS): si el día de mañana
+// vuelve un desplegable de categorías, están en el historial de git de
+// este archivo para recuperar como punto de partida.
+
+// Isotipo de marca (dos flechas) de fondo, bien tenue, como textura de la
+// tarjeta -- el mismo ícono que el logo (Marca.jsx), no un elemento nuevo.
+// pointer-events: none para que no compita con los clics del botón/badge
+// que caen encima.
+.producto-card__marca-agua {
+  position: absolute;
+  pointer-events: none;
+  color: $primary;
+  opacity: 0.07;
+  z-index: 0;
+}
+
+// Todo el contenido real de la tarjeta por encima de la marca de agua.
+.producto-card__contenido {
+  position: relative;
+  z-index: 1;
+}
+
+// =============================================================================
+// Carrusel de "recién agregados" del Home (FEATURE 29/08/2026, pedido del
+// cliente) -- ver CarruselProductos.jsx. La tarjeta en sí es exactamente
+// la misma que en la grilla (.producto-card, más arriba); todo lo de acá
+// abajo es solo el mecanismo de desplazamiento horizontal.
+//
+// FIX (30/08/2026, pedido del cliente, dos vueltas):
+//   1) "sacar el movimiento manual (antes arrastre/swipe + flechas), que
+//      se vayan solos" -- ya no hay flechas (.carrusel-productos__flecha*
+//      se borró, dejó de existir en el JSX) ni arrastre (cursor/
+//      touch-action de la pista tampoco hacen falta más).
+//   2) "lo ideal sería que tenga un movimiento constante" -- la pista ya
+//      no avanza a saltos (antes, un salto cada 5s con CSS transition):
+//      es una animación CSS en loop (@keyframes acá abajo) que la desliza
+//      todo el tiempo a velocidad pareja, como una cinta. --carrusel-
+//      desplazamiento/--carrusel-duracion son custom properties que pone
+//      CarruselProductos.jsx en cada tarjeta según cuántos productos hay
+//      y cuántos entran por pantalla -- ver ese archivo para el porqué de
+//      esos valores (necesarios para que el loop no se note Y para que la
+//      velocidad se sienta constante sea cual sea la cantidad de
+//      productos/tamaño de pantalla).
+// =============================================================================
+.carrusel-productos {
+  position: relative;
+}
+
+.carrusel-productos__viewport {
+  overflow: hidden;
+}
+
+.carrusel-productos__pista {
+  display: flex;
+}
+
+@keyframes carrusel-productos-desplazar {
+  from {
+    transform: translateX(0);
+  }
+  to {
+    // El signo negativo desliza hacia la izquierda (mismo sentido que ya
+    // tenía el carrusel). El valor en sí lo define
+    // --carrusel-desplazamiento (ver CarruselProductos.jsx) -- ni un poco
+    // más ni un poco menos que el ancho de un set completo de productos
+    // reales, para que el reinicio del loop caiga justo donde la pista
+    // está mostrando el arranque de la copia (indistinguible del
+    // principio real).
+    transform: translateX(calc(-1 * var(--carrusel-desplazamiento, 50%)));
+  }
+}
+
+.carrusel-productos__pista--animada {
+  animation: carrusel-productos-desplazar var(--carrusel-duracion, 20s) linear infinite;
+}
+
+// Mouse encima o foco por teclado adentro (ver CarruselProductos.jsx,
+// onMouseEnter/onFocus) -- la animación se congela en el punto donde
+// está, no se reinicia ni salta al pausarse/reanudarse.
+.carrusel-productos__pista--pausada {
+  animation-play-state: paused;
+}
+
+// "Reducir movimiento" activado en el sistema operativo: sin animación
+// -- la pista queda quieta mostrando el primer grupo de productos reales.
+
+
+@media (prefers-reduced-motion: reduce) {
+  .carrusel-productos__pista--animada {
+    animation: none;
+  }
+}
+
+.carrusel-productos__item {
+  flex: 0 0 auto;
+  padding: 0 0.75rem; // mismo gutter que la grilla (Row g-4 = 1.5rem, la mitad de cada lado)
+}
+
+// =============================================================================
+// "Marcas destacadas" (FEATURE 29/08/2026, pedido del cliente) --
+// Configuración → General (grilla de carga admin, ver
+// GrillaMarcasDestacadas.jsx) y franja pública del Home (ver
+// FilaMarcasDestacadas.jsx). Las 10 posiciones son siempre cuadradas
+// (aspect-ratio) y viven en un grid: vaciar una posición no corre ni
+// reorganiza las demás, solo esa celda queda vacía en su lugar.
+// =============================================================================
+
+// Grilla de carga (admin): auto-fill en vez de una cantidad fija de
+// columnas por breakpoint -- el ancho disponible decide solo cuántas
+// entran por fila (móvil angosto: 2; escritorio ancho: hasta 5), sin
+// mantener media queries a mano acá. max-width la deja del tamaño de una
+// tarjeta de configuración, no de todo el ancho de la pantalla.
+.grilla-marcas-destacadas {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(90px, 1fr));
+  gap: 1rem;
+  max-width: 640px;
+}
+
+.marca-destacada-slot {
+  position: relative;
+  display: flex;
+  width: 100%;
+  aspect-ratio: 1 / 1;
+  border-radius: 0.5rem;
+  overflow: hidden;
+  padding: 0;
+  cursor: pointer;
+}
+
+// FIX (30/08/2026, pedido del cliente): "que la aplicación acomode el
+// ancho y altura de las imágenes, sin importar cuáles sean, cuando el
+// dueño las cargue" -- object-fit: cover (no contain) para que CUALQUIER
+// imagen que suba el admin, sea cual sea su proporción original (un
+// isotipo cuadrado, un banner ancho, un logo vertical), termine ocupando
+// el cuadrado completo, todas con el mismo tamaño visual, en vez de
+// quedar con recuadros en blanco alrededor según la proporción de cada
+// una. Recorta lo que sobre (se pierde algún margen del archivo original)
+// en vez de dejar espacio vacío -- vista previa acá igual a como se ve
+// después en el Home (ver .fila-marcas-destacadas__celda img, mismo
+// criterio).
+.marca-destacada-slot img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  display: block;
+}
+
+// Posición ocupada: mismo criterio "superficie" que el resto del panel
+// (fondo + borde propios, para que se note en los dos temas) -- ver
+// .superficie más arriba.
+.marca-destacada-slot:not(.marca-destacada-slot--vacio) {
+  background-color: var(--bs-tertiary-bg);
+  border: 1px solid var(--bs-border-color-translucent);
+}
+
+// Botón "eliminar" (X, bi-x-lg -- ver IconoCerrarMenu): solo visible al
+// pasar el mouse sobre la imagen, pedido explícito del cliente. No usa
+// display:none/block por hover (pointer-events se pierde en pantallas
+// táctiles sin :hover real) -- opacity + que el botón siga ahí, chico, en
+// la esquina.
+.marca-destacada-slot__eliminar {
+  position: absolute;
+  top: 6px;
+  right: 6px;
+  z-index: 1;
+  width: 26px;
+  height: 26px;
+  border-radius: 50%;
+  border: none;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background-color: rgba(0, 0, 0, 0.65);
+  color: #fff;
+  opacity: 0;
+  cursor: pointer;
+  transition: opacity 0.15s ease, background-color 0.15s ease;
+}
+
+.marca-destacada-slot:hover .marca-destacada-slot__eliminar,
+.marca-destacada-slot__eliminar:focus-visible {
+  opacity: 1;
+}
+
+.marca-destacada-slot__eliminar:hover {
+  background-color: rgba(0, 0, 0, 0.85);
+}
+
+// FEATURE (30/08/2026, pedido del cliente): aviso fijo (no solo en hover,
+// a diferencia del botón eliminar) en las posiciones que ya tenían imagen
+// antes de que existiera nombre_marca -- sin una marca asignada, el clic
+// en esa imagen en el Home no tiene a qué catálogo filtrado mandar. Clic
+// en la imagen (ver GrillaMarcasDestacadas.jsx) abre el mismo modal para
+// asignarla.
+.marca-destacada-slot__etiqueta {
+  position: absolute;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  z-index: 1;
+  padding: 0.25rem 0.4rem;
+  font-size: 0.7rem;
+  line-height: 1.2;
+  text-align: center;
+}
+
+.marca-destacada-slot__etiqueta--aviso {
+  background-color: rgba(0, 0, 0, 0.75);
+  color: #ffc107; // $warning de Bootstrap -- mismo amarillo de aviso que el resto de la app
+}
+
+// Posición vacía: marco cuadrado de líneas discontinuas blancas con un
+// "+" centrado, también blanco -- pedido explícito y textual del cliente
+// (tomando como referencia la imagen que mandó). Fondo oscuro fijo (no
+// .superficie / theme-aware) a propósito: es el único lugar donde el
+// marco tiene que verse SIEMPRE blanco, sea cual sea el tema activo del
+// sitio -- $dark es el mismo azul marino que ya usan los navbars.
+.marca-destacada-slot--vacio {
+  background-color: $dark;
+  border: 2px dashed rgba(255, 255, 255, 0.6);
+  color: #fff;
+  align-items: center;
+  justify-content: center;
+  transition: border-color 0.15s ease, filter 0.15s ease;
+}
+
+// filter: brightness (no lighten($dark, ...)) para no atarse a la función
+// de color de Sass -- mismo resultado (un toque más claro que $dark al
+// pasar el mouse/foco) sin depender de nada fuera de CSS puro.
+.marca-destacada-slot--vacio:hover,
+.marca-destacada-slot--vacio:focus-visible {
+  border-color: rgba(255, 255, 255, 0.9);
+  filter: brightness(1.2);
+}
+
+// Franja pública del Home (FilaMarcasDestacadas.jsx): dos filas fijas de
+// 5 -- a diferencia de la grilla admin de más arriba, acá SÍ importa que
+// sean siempre 5 por fila (pedido explícito del cliente), así que la
+// cantidad de columnas queda fija y lo que cede en pantallas angostas es
+// el tamaño de cada celda (minmax con un piso chico), no la cantidad.
+// FEATURE (30/08/2026, pedido del cliente): "que las imágenes que se
+// muestran en el home tengan el mismo ancho que los banners de los
+// productos" -- sin max-width propio, ocupa el mismo ancho que
+// CarruselProductos (ambos cuelgan directo del mismo <Container> en
+// Home.jsx, sin nada que los angoste), y cada celda queda cuadrada
+// (mismo ancho que alto) via aspect-ratio en .fila-marcas-destacadas__celda.
+.fila-marcas-destacadas {
+  display: grid;
+  grid-template-columns: repeat(5, minmax(48px, 1fr));
+  gap: 0.75rem;
+  margin-top: 2.5rem;
+}
+
+// .fila-marcas-destacadas__celda se usa tanto en un <div> (posición vacía,
+// o con imagen pero todavía sin marca asignada -- no clickeable) como en
+// un <Link> de react-router, que renderiza un <a> (posición con marca
+// asignada -- FEATURE 30/08/2026, pedido del cliente: clic manda al
+// catálogo filtrado por esa marca, ver FilaMarcasDestacadas.jsx). El
+// reset de link es para que en ese segundo caso no se vea como un enlace
+// de texto (subrayado, color de link) -- es una imagen, no texto.
+.fila-marcas-destacadas__celda {
+  aspect-ratio: 1 / 1;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  text-decoration: none;
+  color: inherit;
+}
+
+// FIX (30/08/2026, pedido del cliente): object-fit: cover (no contain) --
+// mismo criterio y mismo motivo que .marca-destacada-slot img más arriba
+// (grilla admin): así todas las marcas se ven del mismo tamaño acá,
+// cualquiera sea la proporción de la imagen que se subió.
+.fila-marcas-destacadas__celda img {
+  position: relative;
+  z-index: 1;
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  border-radius: 0.5rem; // mismo radio que .producto-card / .marca-destacada-slot
+  transition: transform 0.2s ease, box-shadow 0.2s ease;
+}
+
+// FEATURE (30/08/2026, pedido del cliente): "al pasar el mouse por encima
+// de cada imagen, que ésta se agrande, sin que ninguna de las otras 9 se
+// vea afectada". transform: scale (no cambiar width/height ni el tamaño
+// de la celda del grid) a propósito: transform no participa del layout,
+// así que agrandar una imagen NUNCA corre ni cambia el tamaño de las
+// demás celdas -- las otras 9 quedan fijas tal cual pide el cliente. El
+// z-index en hover es para que la imagen agrandada se dibuje por encima
+// de las celdas vecinas (si no, al crecer se vería recortada por detrás
+// de la imagen de al lado, que en el DOM viene después).
+//
+// El hover/foco se engancha en .fila-marcas-destacadas__celda (el <a> o
+// <div> que envuelve la imagen), no directo en la <img>: cuando es un
+// <Link>, lo que recibe foco por teclado es el <a>, no la imagen adentro
+// -- :focus-visible en la imagen misma nunca dispararía navegando con Tab.
+.fila-marcas-destacadas__celda:hover img,
+.fila-marcas-destacadas__celda:focus-visible img {
+  transform: scale(1.15);
+  z-index: 2;
+  box-shadow: var(--bs-box-shadow);
+}
+
+// Cursor "clickeable" solo cuando la celda es en verdad un link (marca
+// asignada) -- una posición sin marca todavía se ve, pero no tiene a
+// dónde mandar al hacer clic (ver FilaMarcasDestacadas.jsx).
+a.fila-marcas-destacadas__celda {
+  cursor: pointer;
+}
+
+// Posición vacía (se eliminó la imagen y no se cargó otra todavía): deja
+// el lugar de la celda reservado en blanco -- pedido explícito del
+// cliente: "si se elimina una y no se carga otra nueva, en el home siguen
+// figurando las 10" (las demás no se corren ni se reorganizan).
+.fila-marcas-destacadas__celda--vacia {
+  visibility: hidden;
+}
+
+// Botón "Agregar al carrito": pastilla oscura (no el naranja de marca) con
+// el texto en mayúsculas y un poco de tracking -- así es como se ve en la
+// referencia "Tech Direct" del cliente, se reserva el naranja para el
+// estado "Agregado" y el brillo/hover de la tarjeta.
+.btn-agregar-carrito {
+  letter-spacing: 0.04em;
+}
+
+// Resplandor/brillo del isotipo de marca (Marca.jsx / IconoMarca) -- el
+// efecto "neón" de la referencia visual del cliente. drop-shadow (no
+// box-shadow) porque el ícono es un SVG con forma irregular, no un
+// rectángulo: box-shadow seguiría el borde invisible del <svg>, no el
+// contorno real de las flechas.
+.logo-brillo {
+  filter: drop-shadow(0 0 6px rgba($primary, 0.65)) drop-shadow(0 0 18px rgba($primary, 0.45));
+}
+
+// Botón de Instagram (Contacto.jsx): el degradé oficial de la marca
+// (amarillo → naranja/rojo → magenta → violeta), no un color plano --
+// es lo que hace que se reconozca como "el botón de Instagram" de un
+// vistazo. No sale de $primary/variant porque es un color de marca
+// ajena, no el nuestro.
+.btn-instagram {
+  background: radial-gradient(circle at 30% 107%, #fdf497 0%, #fdf497 5%, #fd5949 45%, #d6249f 60%, #285aeb 90%);
+  border: none;
+  color: #000;
+}
+
+.btn-instagram:hover,
+.btn-instagram:focus {
+  color: #000;
+  filter: brightness(0.92);
+}
+
+// =============================================================================
+// "Relac. Produc." (ConfiguracionRelacionados.jsx) -- pedido puntual del
+// cliente de un rediseño más profesional para ESTA pantalla nada más (no
+// toca el resto de Configuración ni el tema general de la app): estilo
+// propio, distinto al resto de Configuración, con un marco naranja
+// "metálico" alrededor de todo el panel.
+//
+// === FIX UX-04 (auditoría UX/UI 26/08/2026, Media #2) ====================
+// Hasta acá, .panel-relacionados__interior tenía UN solo set de colores
+// fijo (fondo gris oscuro) para los dos temas -- en su momento documentado
+// como "pedido explícito del cliente de un fondo gris", pero eso seguía
+// siendo un problema real en modo claro: el resto del sitio se aclara con
+// data-bs-theme, este panel se quedaba oscuro igual, y se sentía roto en
+// vez de "especial". La solución NO es sacarle la identidad propia (eso sí
+// era pedido del cliente y se mantiene: marco metálico naranja + estética
+// distinta al resto de Configuración) -- es darle una variante correcta
+// por tema en vez de un solo set de colores fijo, igual que ya hace el
+// resto de la app con data-bs-theme. Si el día de mañana hay que ajustar
+// un color, hay que tocar los DOS bloques [data-bs-theme="dark"] / ["light"]
+// de cada regla de acá abajo, no solo uno.
+// ==========================================================================
+.panel-relacionados {
+  background: linear-gradient(135deg, #ffcb8a 0%, $primary 30%, #8a3208 50%, $primary 70%, #ffcb8a 100%);
+  padding: 2px;
+  border-radius: $border-radius-lg;
+  box-shadow: $box-shadow-lg;
+}
+
+.panel-relacionados__interior {
+  border-radius: calc(#{$border-radius-lg} - 2px);
+  padding: 1.75rem;
+}
+
+[data-bs-theme="dark"] .panel-relacionados__interior {
+  background-color: #24272c;
+  color: #edeef0;
+}
+[data-bs-theme="light"] .panel-relacionados__interior {
+  background-color: #fdf3ea;
+  color: #3a2415;
+}
+
+[data-bs-theme="dark"] .panel-relacionados__interior .form-label {
+  color: #edeef0;
+}
+[data-bs-theme="light"] .panel-relacionados__interior .form-label {
+  color: #3a2415;
+}
+
+[data-bs-theme="dark"] .panel-relacionados__interior .text-muted {
+  color: #9aa1ab !important;
+}
+[data-bs-theme="light"] .panel-relacionados__interior .text-muted {
+  color: #8a7361 !important;
+}
+
+[data-bs-theme="dark"] .panel-relacionados__interior .form-control {
+  background-color: #1a1c1f;
+  border-color: rgba($primary, 0.3);
+  color: #edeef0;
+}
+[data-bs-theme="light"] .panel-relacionados__interior .form-control {
+  background-color: #fffaf5;
+  border-color: rgba($primary, 0.35);
+  color: #3a2415;
+}
+
+[data-bs-theme="dark"] .panel-relacionados__interior .form-control:focus {
+  background-color: #1a1c1f;
+  border-color: $primary;
+  color: #edeef0;
+  box-shadow: 0 0 0 0.2rem rgba($primary, 0.25);
+}
+[data-bs-theme="light"] .panel-relacionados__interior .form-control:focus {
+  background-color: #fffaf5;
+  border-color: $primary;
+  color: #3a2415;
+  box-shadow: 0 0 0 0.2rem rgba($primary, 0.25);
+}
+
+[data-bs-theme="dark"] .panel-relacionados__interior .form-control::placeholder {
+  color: #6d7580;
+}
+// FIX (13/09/2026, auditoría UX/UI Punto Crítico #6): antes #b8a494 sobre
+// el fondo #fffaf5 del form-control de más arriba -- ratio ≈2.31:1, bien
+// por debajo del 4.5:1 mínimo de WCAG AA para texto normal (el placeholder
+// de "Buscar producto..." de este panel quedaba casi ilegible en modo
+// claro). shade-color($color, %) es la misma función que ya usa este
+// archivo para el fix de contraste del nav-link activo del sidebar (ver
+// $primary-shade-accesible más arriba) -- acá, sobre el propio color
+// original del placeholder en vez de sobre $primary, para no perder el
+// tono cálido/marrón propio de este panel (mismo espíritu que el resto de
+// .panel-relacionados__interior, todo en esa paleta). shade-color(#b8a494,
+// 35%) da #786b60, ~4.97:1 -- pasa AA con margen sin acercarse tanto al
+// texto normal del panel (#3a2415) como para confundirse con contenido
+// real.
+[data-bs-theme="light"] .panel-relacionados__interior .form-control::placeholder {
+  color: shade-color(#b8a494, 35%);
+}
+
+// La caja con scroll de cada lista de productos (border.rounded en el
+// JSX) -- un tono más marcado que el panel, para que se note el "adentro"
+// de la caja, con un borde naranja bien tenue en vez del gris de Bootstrap.
+[data-bs-theme="dark"] .panel-relacionados__interior .border.rounded {
+  background-color: #1a1c1f;
+  border-color: rgba($primary, 0.25) !important;
+}
+[data-bs-theme="light"] .panel-relacionados__interior .border.rounded {
+  background-color: #fffaf5;
+  border-color: rgba($primary, 0.3) !important;
+}
+
+// Encabezado de cada categoría dentro de una lista (bg-body-secondary en
+// el JSX): franja naranja tenue en vez del gris neutro de Bootstrap, para
+// que se distinga de un vistazo de las filas de producto.
+[data-bs-theme="dark"] .panel-relacionados__interior .bg-body-secondary {
+  background-color: rgba($primary, 0.14) !important;
+  color: #ffb877 !important;
+}
+[data-bs-theme="light"] .panel-relacionados__interior .bg-body-secondary {
+  background-color: rgba($primary, 0.12) !important;
+  color: #b34e00 !important;
+}
+
+// Fila de producto no seleccionada (btn-light en el JSX): transparente
+// sobre el fondo del panel, con un resalte naranja tenue al pasar el mouse.
+[data-bs-theme="dark"] .panel-relacionados__interior .btn-light {
+  background-color: transparent;
+  border-color: transparent;
+  color: #d7dadf;
+}
+[data-bs-theme="dark"] .panel-relacionados__interior .btn-light:hover {
+  background-color: rgba($primary, 0.14);
+  color: #fff;
+}
+[data-bs-theme="light"] .panel-relacionados__interior .btn-light {
+  background-color: transparent;
+  border-color: transparent;
+  color: #5a4432;
+}
+[data-bs-theme="light"] .panel-relacionados__interior .btn-light:hover {
+  background-color: rgba($primary, 0.12);
+  color: #3a2415;
+}
+
+// Fila de producto seleccionada (btn-primary en el JSX): ya sale en
+// naranja de marca por la variable $primary de arriba -- se ve bien sólida
+// en los dos temas sin necesitar una variante aparte, esto solo saca la
+// sombra de foco por defecto.
+.panel-relacionados__interior .btn-primary {
+  background-color: $primary;
+  border-color: $primary;
+  box-shadow: none;
+}
+
+// Badge "Relacionado" y los chips de "Ya relacionados con X" (badge
+// bg-secondary en el JSX): chip naranja tenue con borde, en vez del gris
+// plano de Bootstrap -- más acorde al marco metálico del panel.
+[data-bs-theme="dark"] .panel-relacionados__interior .badge.bg-secondary {
+  background-color: rgba($primary, 0.16) !important;
+  color: #ffb877;
+  border: 1px solid rgba($primary, 0.4);
+}
+[data-bs-theme="light"] .panel-relacionados__interior .badge.bg-secondary {
+  background-color: rgba($primary, 0.14) !important;
+  color: #b34e00;
+  border: 1px solid rgba($primary, 0.4);
+}
+
+// FIX UX-03 (auditoría UX/UI 26/08/2026, Punto Crítico #3): el aviso de
+// "vinculado"/error de vincular-quitar de esta pantalla ahora es un toast
+// global (ver ConfiguracionRelacionados.jsx y utils/notificaciones.js), ya
+// no un <Alert> propio -- por eso la regla de .alert-success de acá adentro
+// se sacó (ya no hay ningún <Alert variant="success"> dentro del panel). El
+// único <Alert> que sigue viviendo adentro es el de "no pude cargar los
+// productos" (variant="danger"), así que .alert-danger se mantiene, ahora
+// con sus dos variantes de tema.
+[data-bs-theme="dark"] .panel-relacionados__interior .alert-danger {
+  background-color: rgba($danger, 0.16);
+  border-color: rgba($danger, 0.4);
+  color: #ff9fb3;
+}
+[data-bs-theme="light"] .panel-relacionados__interior .alert-danger {
+  background-color: rgba($danger, 0.12);
+  border-color: rgba($danger, 0.4);
+  color: #8a1f37;
+}
