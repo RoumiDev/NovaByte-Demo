@@ -200,7 +200,7 @@ app.mount("/static/productos", StaticFiles(directory=STORAGE_PRODUCTOS_DIR), nam
 # menú de "Catálogo".
 app.mount("/static/categorias", StaticFiles(directory=STORAGE_CATEGORIAS_DIR), name="categorias-imagenes")
 
-# Servir el build del frontend (npm run build en LTI_frontend) DESDE ESTA
+# Servir el build del frontend (npm run build en front/) DESDE ESTA
 # MISMA API cuando la carpeta existe -- pensado para demos temporales
 # expuestas con un solo túnel (ver FRONTEND_DIST_DIR en app/core/config.py),
 # NO para el despliegue real (ahí el frontend va aparte). Si no se corrió el
@@ -236,7 +236,7 @@ else:
     logger.info(
         "FRONTEND_DIST_DIR no existe (%s): esta API no está sirviendo el "
         "frontend, solo funciona como API. Correr `npm run build` en "
-        "LTI_frontend si se necesita servir todo desde acá (ver guía de "
+        "front/ si se necesita servir todo desde acá (ver guía de "
         "despliegue temporal con túnel).",
         FRONTEND_DIST_DIR,
     )
