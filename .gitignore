@@ -1,0 +1,26 @@
+# Reglas de nivel REPO -- ver también back/.gitignore y front/.gitignore
+# para lo propio de cada carpeta (entorno virtual de Python, node_modules,
+# storage/ de imágenes, etc.).
+
+# Variables de entorno reales -- nunca se commitean, en ningún lado del
+# repo (además de la regla puntual ".env" que ya tienen back/.gitignore y
+# front/.gitignore, ésta es una red de contención a nivel raíz para
+# cualquier archivo *.env que termine en cualquier otra carpeta).
+.env
+*.env
+!*.env.example
+
+# Carpeta donde el cliente de escritorio de Claude/Cowork puede guardar
+# archivos que el asistente entrega durante una sesión -- nunca es código
+# del proyecto, no se versiona.
+#
+# HALLAZGO (18/09/2026): un archivo de acá adentro, "Claude outputs/back.env"
+# (una plantilla de .env con una SECRET_KEY ya generada), terminó
+# commiteado y pusheado a este repo público sin querer, porque hasta este
+# commit no existía ningún .gitignore a nivel raíz -- back/.gitignore solo
+# cubre lo que está DENTRO de back/, nunca iba a alcanzar a un archivo
+# suelto acá. Se reescribió el historial para sacarlo (ver el README del
+# commit correspondiente) y se rotó esa clave. back/.env.example reemplaza
+# a ese archivo de la forma correcta: sin ningún secreto ya generado
+# adentro.
+Claude outputs/
