@@ -17,10 +17,17 @@ from app.core.config import STORAGE_PRODUCTOS_DIR
 from app.core.database import get_db
 from app.core.pagination import Limit, Skip
 from app.core.rate_limit import confirmar_password_admin_rate_limiter
-from app.dependencies.auth import get_current_user, require_admin, verificar_password_admin
+from app.dependencies.auth import (
+    get_current_user,
+    get_tenant_scope,
+    get_tenant_scope_opcional,
+    require_admin,
+    verificar_password_admin,
+)
 from app.models.favorite import Favorito
 from app.models.product import Categoria, Producto, ProductoRelacionado
 from app.models.user import Usuario
+from app.services.vercel_blob import VercelBlobError, blob_habilitado, subir_a_blob
 from app.schemas.favorite import FavoritoEstadoResponse, FavoritoRead
 from app.schemas.product import (
     ConfirmacionPassword,
@@ -62,6 +69,20 @@ _FORMATOS_PERMITIDOS = {"JPEG": "jpg", "PNG": "png", "WEBP": "webp"}
 # no tiene sentido permitir buscar con un texto más largo que el propio
 # campo que se está buscando.
 _MAX_LONGITUD_BUSQUEDA = 255
+
+
+def _con_tenant(query, columna, tenant_scope: int | None):
+    """Agrega el filtro de tenant a una query -- ver el comentario grande
+    en get_tenant_scope (app/dependencies/auth.py) para qué significa
+    tenant_scope. None filtra por "columna IS NULL" (tienda real); un id
+    filtra por "columna == ese id" (sólo ese tenant demo). Duplicado en
+    app/router/categories.py a propósito -- mismo criterio que
+    _MAX_IMAGEN_BYTES/_FORMATOS_PERMITIDOS ahí: son dos routers
+    independientes que no tienen por qué compartir código sólo porque hoy
+    la lógica coincide."""
+    if tenant_scope is None:
+        return query.where(columna.is_(None))
+    return query.where(columna == tenant_scope)
 
 
 def _normalizar_campos_segun_modo_precio(producto: Producto) -> None:
@@ -108,6 +129,7 @@ def list_products(
     # sigue usando este mismo listado para "últimos ingresados" sin
     # enterarse de este cambio).
     orden: OrdenProductos = "nuevo",
+    tenant_scope: int | None = Depends(get_tenant_scope_opcional),
     db: Session = Depends(get_db),
 ) -> list[Producto]:
     """Listado público: solo productos activos. No expone los dados de baja.
@@ -121,6 +143,13 @@ def list_products(
     exacta a propósito -- se arma en el frontend a partir de un <select>
     con las marcas reales (ver GET /productos/marcas más abajo), no de
     texto libre, así que no hace falta (ni conviene) un ilike ahí.
+
+    FEATURE (17/09/2026, pedido del cliente): "accesos temporales a la
+    demo, aislados entre visitantes" -- tenant_scope (ver
+    get_tenant_scope_opcional en app/dependencies/auth.py) filtra a la
+    tienda real para un visitante anónimo, o al catálogo propio de un
+    admin demo logueado -- nunca los dos mezclados, y nunca el de otro
+    tenant demo.
     """
     # selectinload(Producto.categoria): ProductoRead expone la categoría
     # anidada completa (ver schemas/product.py) y Producto.categoria es
@@ -130,6 +159,7 @@ def list_products(
     # tamaño del listado, siempre son 2 queries en total (mismo criterio que
     # _pedido_query en router/orders.py).
     query = select(Producto).where(Producto.is_active.is_(True)).options(selectinload(Producto.categoria))
+    query = _con_tenant(query, Producto.tenant_id, tenant_scope)
     if categoria_id is not None:
         query = query.where(Producto.categoria_id == categoria_id)
     if nombre:
@@ -174,7 +204,11 @@ def list_products(
 
 
 @router.get("/marcas", response_model=list[str])
-def list_brands(categoria_id: int | None = None, db: Session = Depends(get_db)) -> list[str]:
+def list_brands(
+    categoria_id: int | None = None,
+    tenant_scope: int | None = Depends(get_tenant_scope_opcional),
+    db: Session = Depends(get_db),
+) -> list[str]:
     """Marcas distintas entre los productos activos, para armar el <select>
     del filtro por marca sin inventar una lista aparte que se desincronice
     de lo que realmente hay cargado.
@@ -182,8 +216,11 @@ def list_brands(categoria_id: int | None = None, db: Session = Depends(get_db)) 
     categoria_id opcional: filtra a las marcas que existen dentro de esa
     categoría -- lo usa el mega menú del navbar (columna de marcas por
     categoría), que si no acotara por categoría terminaría mostrando todas
-    las marcas de la tienda en cada categoría."""
+    las marcas de la tienda en cada categoría.
+
+    tenant_scope: mismo criterio que list_products (ver ese docstring)."""
     query = select(Producto.marca).where(Producto.is_active.is_(True))
+    query = _con_tenant(query, Producto.tenant_id, tenant_scope)
     if categoria_id is not None:
         query = query.where(Producto.categoria_id == categoria_id)
     query = query.distinct().order_by(Producto.marca)
@@ -203,6 +240,7 @@ def list_all_products(
     # False = solo dados de baja -- refleja el <select> "Todos los
     # estados"/"Dados de alta"/"Dados de baja" de Productos.jsx.
     activo: bool | None = None,
+    tenant_scope: int | None = Depends(get_tenant_scope),
     db: Session = Depends(get_db),
 ) -> list[Producto]:
     """Listado admin: a diferencia de GET /productos/ (público, solo
@@ -211,6 +249,11 @@ def list_all_products(
     "Dar de alta" en los que están de baja (FEATURE 27/08/2026, pedido del
     cliente). Admin-only a propósito: un producto de baja no debería
     filtrarse a nadie que no sea quien lo administra.
+
+    FEATURE (17/09/2026, pedido del cliente): tenant_scope (ver
+    get_tenant_scope en app/dependencies/auth.py) acota este listado al
+    catálogo de la tienda real para un admin de siempre, o al catálogo
+    propio de un admin demo -- nunca a los dos mezclados.
 
     Declarado ANTES de GET /{producto_id} -- mismo motivo que /marcas y
     /favoritos más arriba: si quedara después, "/todos" matchearía ese path
@@ -236,6 +279,7 @@ def list_all_products(
     /productos/{id}, sin cambios, siguen en ProductoRead a secas).
     """
     query = select(Producto).options(selectinload(Producto.categoria))
+    query = _con_tenant(query, Producto.tenant_id, tenant_scope)
     if categoria_id is not None:
         query = query.where(Producto.categoria_id == categoria_id)
     # Mismo criterio que list_products: nombre matchea producto O categoría
@@ -282,13 +326,24 @@ def list_favoritos(
 
 
 @router.get("/{producto_id}", response_model=ProductoRead)
-def get_product(producto_id: int, db: Session = Depends(get_db)) -> Producto:
+def get_product(
+    producto_id: int,
+    tenant_scope: int | None = Depends(get_tenant_scope_opcional),
+    db: Session = Depends(get_db),
+) -> Producto:
     """Detalle público: solo si está activo (un producto dado de baja
-    responde 404, igual que uno inexistente, para no distinguir el caso)."""
+    responde 404, igual que uno inexistente, para no distinguir el caso).
+
+    FEATURE (17/09/2026, pedido del cliente): mismo tenant_scope que
+    list_products -- ver ese docstring. Sin este filtro, un admin demo
+    podría ver la ficha de un producto REAL adivinando su id (o viceversa,
+    ver un producto de demo desde afuera de la sesión de ese tenant)."""
     producto = db.execute(
-        select(Producto)
-        .where(Producto.id == producto_id, Producto.is_active.is_(True))
-        .options(selectinload(Producto.categoria))
+        _con_tenant(
+            select(Producto).where(Producto.id == producto_id, Producto.is_active.is_(True)),
+            Producto.tenant_id,
+            tenant_scope,
+        ).options(selectinload(Producto.categoria))
     ).scalar_one_or_none()
     if producto is None:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Producto no encontrado")
@@ -368,7 +423,11 @@ def quitar_favorito(
 
 
 @router.get("/{producto_id}/relacionados", response_model=list[ProductoRead])
-def list_productos_relacionados(producto_id: int, db: Session = Depends(get_db)) -> list[Producto]:
+def list_productos_relacionados(
+    producto_id: int,
+    tenant_scope: int | None = Depends(get_tenant_scope_opcional),
+    db: Session = Depends(get_db),
+) -> list[Producto]:
     """Productos vinculados a este (ver "También vas a necesitar" en
     ProductoDetalle.jsx) -- ej. el tóner y las hojas vinculados a una
     impresora. Público, igual que GET /{producto_id}: cualquiera puede ver
@@ -394,12 +453,11 @@ def list_productos_relacionados(producto_id: int, db: Session = Depends(get_db))
     ]
     if not ids_relacionados:
         return []
-    query = (
-        select(Producto)
-        .where(Producto.id.in_(ids_relacionados), Producto.is_active.is_(True))
-        .options(selectinload(Producto.categoria))
-        .order_by(Producto.nombre)
-    )
+    query = _con_tenant(
+        select(Producto).where(Producto.id.in_(ids_relacionados), Producto.is_active.is_(True)),
+        Producto.tenant_id,
+        tenant_scope,
+    ).options(selectinload(Producto.categoria)).order_by(Producto.nombre)
     return list(db.execute(query).scalars())
 
 
@@ -410,7 +468,10 @@ def list_productos_relacionados(producto_id: int, db: Session = Depends(get_db))
     dependencies=[Depends(require_admin)],
 )
 def crear_producto_relacionado(
-    producto_id: int, body: ProductoRelacionadoCreate, db: Session = Depends(get_db)
+    producto_id: int,
+    body: ProductoRelacionadoCreate,
+    tenant_scope: int | None = Depends(get_tenant_scope),
+    db: Session = Depends(get_db),
 ) -> dict:
     """Vincula dos productos entre sí (panel admin, formulario de
     Productos). Alcanza con cargarlo una vez desde cualquiera de los dos
@@ -421,6 +482,11 @@ def crear_producto_relacionado(
     Idempotente, mismo criterio que marcar_favorito más arriba: vincular
     dos veces el mismo par no duplica la fila (UniqueConstraint de la
     tabla) ni devuelve error.
+
+    FEATURE (17/09/2026, pedido del cliente): los dos productos tienen que
+    ser del MISMO tenant que quien pide esto -- sin este chequeo, un admin
+    demo podría vincular un producto de demo con uno REAL (o de otro
+    tenant), ensuciando el catálogo de otro.
     """
     otro_id = body.producto_relacionado_id
     if otro_id == producto_id:
@@ -429,7 +495,13 @@ def crear_producto_relacionado(
         )
 
     ids_validos = set(
-        db.execute(select(Producto.id).where(Producto.id.in_((producto_id, otro_id)))).scalars()
+        db.execute(
+            _con_tenant(
+                select(Producto.id).where(Producto.id.in_((producto_id, otro_id))),
+                Producto.tenant_id,
+                tenant_scope,
+            )
+        ).scalars()
     )
     if producto_id not in ids_validos or otro_id not in ids_validos:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Producto no encontrado")
@@ -458,10 +530,31 @@ def crear_producto_relacionado(
     response_model=ProductoRelacionadoEstadoResponse,
     dependencies=[Depends(require_admin)],
 )
-def eliminar_producto_relacionado(producto_id: int, otro_id: int, db: Session = Depends(get_db)) -> dict:
+def eliminar_producto_relacionado(
+    producto_id: int,
+    otro_id: int,
+    tenant_scope: int | None = Depends(get_tenant_scope),
+    db: Session = Depends(get_db),
+) -> dict:
     """Desvincula dos productos (panel admin). Idempotente en el otro
     sentido, mismo criterio que quitar_favorito: desvincular un par que ya
-    no estaba vinculado tampoco es un error."""
+    no estaba vinculado tampoco es un error.
+
+    FEATURE (17/09/2026, pedido del cliente): mismo chequeo de tenant que
+    crear_producto_relacionado -- un admin demo sólo puede desvincular
+    productos de SU propio tenant."""
+    ids_validos = set(
+        db.execute(
+            _con_tenant(
+                select(Producto.id).where(Producto.id.in_((producto_id, otro_id))),
+                Producto.tenant_id,
+                tenant_scope,
+            )
+        ).scalars()
+    )
+    if producto_id not in ids_validos or otro_id not in ids_validos:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Producto no encontrado")
+
     id_a, id_b = sorted((producto_id, otro_id))
     db.execute(
         delete(ProductoRelacionado).where(
@@ -515,6 +608,24 @@ async def subir_imagen_producto(archivo: UploadFile = File(...)) -> dict:
         )
 
     nombre_archivo = f"{uuid.uuid4().hex}.{extension}"
+
+    # FEATURE (17/09/2026, deploy en Vercel): blob_habilitado() (ver
+    # app/services/vercel_blob.py) decide entre los dos modos según haya o
+    # no BLOB_READ_WRITE_TOKEN configurado (app/core/config.py) -- en
+    # Vercel el filesystem es de sólo lectura fuera de /tmp, así que ahí
+    # SIEMPRE hace falta este camino; en desarrollo local sigue guardando
+    # en disco como siempre (más abajo).
+    if blob_habilitado():
+        content_type = f"image/{'jpeg' if extension == 'jpg' else extension}"
+        try:
+            url = await subir_a_blob(contenido, nombre_archivo, "productos", content_type)
+        except VercelBlobError:
+            raise HTTPException(
+                status_code=status.HTTP_502_BAD_GATEWAY,
+                detail="No se pudo subir la imagen. Intentá de nuevo en unos minutos.",
+            )
+        return {"url": url}
+
     (STORAGE_PRODUCTOS_DIR / nombre_archivo).write_bytes(contenido)
 
     # FIX B-03 (auditoría QA+Seguridad 28/08/2026): antes acá se armaba la
@@ -540,7 +651,11 @@ async def subir_imagen_producto(archivo: UploadFile = File(...)) -> dict:
     status_code=status.HTTP_201_CREATED,
     dependencies=[Depends(require_admin)],
 )
-def create_product(body: ProductoCreate, db: Session = Depends(get_db)) -> Producto:
+def create_product(
+    body: ProductoCreate,
+    tenant_scope: int | None = Depends(get_tenant_scope),
+    db: Session = Depends(get_db),
+) -> Producto:
     """FEATURE (11/09/2026, pedido del cliente): response_model pasa a
     ProductoAdminRead (antes ProductoRead) -- ver el comentario grande en
     list_all_products más arriba sobre el porqué. ProductoCreate ya validó
@@ -551,11 +666,21 @@ def create_product(body: ProductoCreate, db: Session = Depends(get_db)) -> Produ
     es 'directo', ProductoCreate no expone costo/costo_incluye_iva/
     utilidad_porcentaje así que ya llegan en None; si es 'costo_utilidad',
     moneda_carga sí trae su default ("USD") aunque no se vaya a usar, y
-    ESO es lo que necesita limpiarse."""
-    if db.get(Categoria, body.categoria_id) is None:
+    ESO es lo que necesita limpiarse.
+
+    FEATURE (17/09/2026, pedido del cliente): "accesos temporales a la
+    demo" -- categoria_id tiene que ser una categoría del MISMO tenant (si
+    no, un admin demo podría colgar un producto de una categoría real o de
+    otro tenant), y el producto nuevo nace marcado con tenant_scope -- así
+    queda automáticamente aislado del resto (ver get_tenant_scope,
+    app/dependencies/auth.py).
+    """
+    if db.execute(
+        _con_tenant(select(Categoria.id).where(Categoria.id == body.categoria_id), Categoria.tenant_id, tenant_scope)
+    ).scalar_one_or_none() is None:
         raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="categoria_id no existe.")
 
-    producto = Producto(**body.model_dump())
+    producto = Producto(**body.model_dump(), tenant_id=tenant_scope)
     _normalizar_campos_segun_modo_precio(producto)
     db.add(producto)
     try:
@@ -598,8 +723,16 @@ def update_product(
     stock sueltos de ConfiguracionStock.jsx, que no tienen nada que ver con
     esto y son frecuentes -- terminaría bloqueando ese uso legítimo. Ver el
     comentario grande en app/core/rate_limit.py.
+
+    FEATURE (17/09/2026, pedido del cliente): "accesos temporales a la
+    demo" -- el producto tiene que ser del MISMO tenant que admin_actual
+    (404 si no, mismo criterio IDOR que el resto de la app: no distingue
+    "no existe" de "es de otro tenant"), y si el PATCH cambia categoria_id,
+    la categoría nueva también tiene que ser de ese mismo tenant.
     """
-    producto = db.get(Producto, producto_id)
+    producto = db.execute(
+        _con_tenant(select(Producto).where(Producto.id == producto_id), Producto.tenant_id, admin_actual.tenant_id)
+    ).scalar_one_or_none()
     if producto is None:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Producto no encontrado")
 
@@ -614,7 +747,13 @@ def update_product(
         confirmar_password_admin_rate_limiter(request)
         verificar_password_admin(password_actual, admin_actual, request)
 
-    if "categoria_id" in changes and db.get(Categoria, changes["categoria_id"]) is None:
+    if "categoria_id" in changes and db.execute(
+        _con_tenant(
+            select(Categoria.id).where(Categoria.id == changes["categoria_id"]),
+            Categoria.tenant_id,
+            admin_actual.tenant_id,
+        )
+    ).scalar_one_or_none() is None:
         raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="categoria_id no existe.")
 
     # FEATURE (11/09/2026, pedido del cliente): "costo + IVA + utilidad +
@@ -705,7 +844,9 @@ def deactivate_product(
     del decorador -- ver el comentario grande en app/core/rate_limit.py.
     """
     verificar_password_admin(confirmacion.password_actual, admin_actual, request)
-    producto = db.get(Producto, producto_id)
+    producto = db.execute(
+        _con_tenant(select(Producto).where(Producto.id == producto_id), Producto.tenant_id, admin_actual.tenant_id)
+    ).scalar_one_or_none()
     if producto is None:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Producto no encontrado")
     producto.is_active = False

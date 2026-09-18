@@ -9,7 +9,7 @@
 // al crear el pedido, solo producto_id y cantidad.
 import { createContext, useCallback, useContext, useEffect, useMemo, useState } from "react";
 
-const STORAGE_KEY = "lti_carrito";
+const STORAGE_KEY = "novabyte_carrito";
 
 function leerDeStorage() {
   try {

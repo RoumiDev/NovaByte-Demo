@@ -4,46 +4,28 @@ annotated-types==0.8.0
 anyio==4.14.2
 APScheduler==3.11.3
 bcrypt==4.0.1
-boolean.py==5.0
-build==1.5.0
-CacheControl==0.14.4
 certifi==2026.7.22
 cffi==2.1.1
 charset-normalizer==3.5.1
 click==8.4.2
 colorama==0.4.6
 cryptography==50.0.0
-cyclonedx-python-lib==11.12.0
-defusedxml==0.7.1
 ecdsa==0.19.2
 fastapi==0.141.1
-filelock==3.32.3
 greenlet==3.5.5
 h11==0.16.0
 httptools==0.8.0
 idna==3.18
-installer==1.0.1
-license-expression==30.4.4
 Mako==1.4.1
 markdown-it-py==4.2.0
 MarkupSafe==3.0.3
 mdurl==0.1.2
 mercadopago==3.4.0
 msgpack==1.2.1
-nab-index==0.0.13
-nab-python==0.0.13
-nab-resolver==0.0.13
-packageurl-python==0.17.6
 packaging==26.3
 passlib==1.7.4
 pillow==12.2.0
-pip-api==0.0.34
-pip-requirements-parser==32.0.1
-pip_audit==2.10.1
-pipdeptree==4.2.1
-platformdirs==4.11.3
 psycopg2-binary==2.9.12
-py-serializable==2.1.0
 pyasn1==0.6.4
 pycparser==3.0
 pydantic==2.13.4
@@ -51,7 +33,6 @@ pydantic-settings==2.15.0
 pydantic_core==2.46.4
 Pygments==2.21.0
 pyparsing==3.3.2
-pyproject_hooks==1.2.0
 python-dotenv==1.2.2
 python-jose==3.5.0
 python-multipart==0.0.32
@@ -63,14 +44,25 @@ six==1.17.0
 sortedcontainers==2.4.0
 SQLAlchemy==2.0.52
 starlette==1.6.0
-tomli==2.4.1
-tomli_w==1.2.0
-truststore==0.10.4
 typing-inspection==0.4.4
 typing_extensions==4.16.0
 tzdata==2026.4
 tzlocal==5.4.4
 urllib3==2.7.0
 uvicorn==0.52.3
+# FEATURE (17/09/2026, deploy en Vercel): SDK oficial de Vercel Blob (ver
+# app/services/vercel_blob.py) -- subida de imágenes de productos/
+# categorías cuando el filesystem local no es una opción (filesystem de
+# sólo lectura en una función serverless, ver EN_VERCEL en
+# app/core/config.py).
+vercel==0.11.3
 watchfiles==1.2.0
-websockets==17.0.1
+# FIX (17/09/2026, deploy en Vercel): NO fijado a un patch exacto como el
+# resto de este archivo -- vercel==0.11.3 (más arriba) exige
+# websockets<17, así que un ==17.0.1 (la versión que sí uso el resto del
+# proyecto en la instalación original) choca directo y pip ni siquiera
+# puede resolver el instalado. uvicorn (con el extra [standard] que trae
+# esta build) acepta cualquier 12.x-16.x sin problema, así que se deja un
+# rango en vez de un pin exacto -- único caso de todo este archivo en el
+# que se hizo así, justamente por este choque puntual.
+websockets>=12.0,<17

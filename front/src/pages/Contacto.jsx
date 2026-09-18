@@ -20,14 +20,18 @@ import { IconoInstagram, IconoWhatsapp } from "../components/iconos";
 //     cada línea.
 //   INSTAGRAM_USUARIO: el @ de Instagram, sin el "@".
 // -----------------------------------------------------------------------
-const DIRECCION = "Ocampo 1038, Cañada de Gómez, Santa Fe";
+// Datos ficticios para la demo (ver DEMO.md en la raíz del repo) -- el
+// negocio real detrás de este código no es "NovaByte" ni tiene local en
+// esta dirección. Reemplazar por los datos reales si este archivo se usa
+// para una tienda de verdad.
+const DIRECCION = "Av. Siempre Viva 123, Ciudad Autónoma de Buenos Aires";
 const MAPA_EMBED_SRC =
-  "https://www.google.com/maps/embed?pb=!1m18!1m12!1m3!1d3353.0015574569666!2d-61.39703155801718!3d-32.81872370588722!2m3!1f0!2f0!3f0!3m2!1i1024!2i768!4f13.1!3m3!1m2!1s0x95c9de675ed1a4f3%3A0xbe6ce9558d4ae25c!2sOcampo%201038%2C%20S2500FRV%20Ca%C3%B1ada%20de%20Gomez%2C%20Santa%20Fe!5e0!3m2!1ses-419!2sar!4v1787305495193!5m2!1ses-419!2sar";
+  "https://www.google.com/maps?q=Buenos+Aires,+Argentina&output=embed";
 const WHATSAPP = [
-  { numero: "543471685718", etiqueta: "Ventas" },
-  { numero: "543471351090", etiqueta: "Servicio técnico" },
+  { numero: "5491100000001", etiqueta: "Ventas" },
+  { numero: "5491100000002", etiqueta: "Servicio técnico" },
 ];
-const INSTAGRAM_USUARIO = "ltinformatica_cdg";
+const INSTAGRAM_USUARIO = "novabyte.demo";
 
 const WHATSAPP_MENSAJE = "Hola! Quería hacer una consulta.";
 
@@ -104,7 +108,7 @@ export default function Contacto() {
         <Col md={7}>
           <Card className="superficie shadow-sm h-100 overflow-hidden">
             <iframe
-              title="Ubicación de LT-Informática"
+              title="Ubicación de NovaByte"
               src={MAPA_EMBED_SRC}
               width="100%"
               height="100%"

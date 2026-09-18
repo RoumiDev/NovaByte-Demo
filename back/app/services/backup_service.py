@@ -89,7 +89,7 @@ _CARPETA_CATEGORIAS_EN_ZIP = "storage/categorias"
 # Contexto de dominio para la firma de backups -- separado de cualquier otro
 # uso de SECRET_KEY (JWT, etc.) a propósito: así una clave derivada acá
 # nunca puede reutilizarse para falsificar ni validar nada de otro sistema.
-_CONTEXTO_FIRMA_BACKUP = b"lt-informatica-backup-hmac-v1"
+_CONTEXTO_FIRMA_BACKUP = b"novabyte-backup-hmac-v1"
 
 
 class BackupError(Exception):

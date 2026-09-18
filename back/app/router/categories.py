@@ -14,7 +14,7 @@ from app.core.config import STORAGE_CATEGORIAS_DIR
 from app.core.database import get_db
 from app.core.pagination import Limit, Skip
 from app.core.rate_limit import confirmar_password_admin_rate_limiter
-from app.dependencies.auth import require_admin, verificar_password_admin
+from app.dependencies.auth import get_tenant_scope, get_tenant_scope_opcional, require_admin, verificar_password_admin
 from app.models.product import Categoria
 from app.models.user import Usuario
 from app.schemas.product import (
@@ -24,8 +24,17 @@ from app.schemas.product import (
     ConfirmacionPassword,
     ImagenProductoResponse,
 )
+from app.services.vercel_blob import VercelBlobError, blob_habilitado, subir_a_blob
 
 router = APIRouter()
+
+
+def _con_tenant(query, columna, tenant_scope: int | None):
+    """Ver el comentario grande en la copia idéntica de app/router/products.py
+    -- duplicado a propósito, mismo criterio que _MAX_IMAGEN_BYTES acá abajo."""
+    if tenant_scope is None:
+        return query.where(columna.is_(None))
+    return query.where(columna == tenant_scope)
 
 # Mismos límites y criterio que subir_imagen_producto en router/products.py
 # (ver los comentarios ahí): 5MB de tope, y solo los formatos que un
@@ -38,15 +47,29 @@ _FORMATOS_PERMITIDOS = {"JPEG": "jpg", "PNG": "png", "WEBP": "webp"}
 
 
 @router.get("/", response_model=list[CategoriaRead])
-def list_categories(skip: Skip = 0, limit: Limit = 20, db: Session = Depends(get_db)) -> list[Categoria]:
-    return list(
-        db.execute(select(Categoria).order_by(Categoria.nombre).offset(skip).limit(limit)).scalars()
-    )
+def list_categories(
+    skip: Skip = 0,
+    limit: Limit = 20,
+    tenant_scope: int | None = Depends(get_tenant_scope_opcional),
+    db: Session = Depends(get_db),
+) -> list[Categoria]:
+    """FEATURE (17/09/2026, pedido del cliente): tenant_scope (ver
+    get_tenant_scope_opcional en app/dependencies/auth.py) filtra a la
+    tienda real para un visitante anónimo, o al catálogo propio de un
+    admin demo logueado."""
+    query = _con_tenant(select(Categoria), Categoria.tenant_id, tenant_scope)
+    return list(db.execute(query.order_by(Categoria.nombre).offset(skip).limit(limit)).scalars())
 
 
 @router.get("/{categoria_id}", response_model=CategoriaRead)
-def get_category(categoria_id: int, db: Session = Depends(get_db)) -> Categoria:
-    categoria = db.get(Categoria, categoria_id)
+def get_category(
+    categoria_id: int,
+    tenant_scope: int | None = Depends(get_tenant_scope_opcional),
+    db: Session = Depends(get_db),
+) -> Categoria:
+    categoria = db.execute(
+        _con_tenant(select(Categoria).where(Categoria.id == categoria_id), Categoria.tenant_id, tenant_scope)
+    ).scalar_one_or_none()
     if categoria is None:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Categoría no encontrada")
     return categoria
@@ -91,6 +114,20 @@ async def subir_imagen_categoria(archivo: UploadFile = File(...)) -> dict:
         )
 
     nombre_archivo = f"{uuid.uuid4().hex}.{extension}"
+
+    # FEATURE (17/09/2026, deploy en Vercel) -- mismo criterio que
+    # subir_imagen_producto en app/router/products.py, ver los comentarios ahí.
+    if blob_habilitado():
+        content_type = f"image/{'jpeg' if extension == 'jpg' else extension}"
+        try:
+            url = await subir_a_blob(contenido, nombre_archivo, "categorias", content_type)
+        except VercelBlobError:
+            raise HTTPException(
+                status_code=status.HTTP_502_BAD_GATEWAY,
+                detail="No se pudo subir la imagen. Intentá de nuevo en unos minutos.",
+            )
+        return {"url": url}
+
     (STORAGE_CATEGORIAS_DIR / nombre_archivo).write_bytes(contenido)
 
     # FIX B-03 (auditoría QA+Seguridad 28/08/2026) -- mismo criterio que
@@ -109,8 +146,17 @@ async def subir_imagen_categoria(archivo: UploadFile = File(...)) -> dict:
     status_code=status.HTTP_201_CREATED,
     dependencies=[Depends(require_admin)],
 )
-def create_category(body: CategoriaCreate, db: Session = Depends(get_db)) -> Categoria:
-    categoria = Categoria(**body.model_dump())
+def create_category(
+    body: CategoriaCreate,
+    tenant_scope: int | None = Depends(get_tenant_scope),
+    db: Session = Depends(get_db),
+) -> Categoria:
+    """FEATURE (17/09/2026, pedido del cliente): la categoría nueva nace
+    marcada con tenant_scope -- ver el comentario grande en
+    Categoria.tenant_id (app/models/product.py) sobre los dos índices
+    únicos parciales que hacen que el mismo nombre pueda repetirse una vez
+    por tenant sin chocar."""
+    categoria = Categoria(**body.model_dump(), tenant_id=tenant_scope)
     db.add(categoria)
     try:
         db.commit()
@@ -142,8 +188,16 @@ def update_category(
     código (guardada bajo "if changes:"), así que dependencies=[] del
     decorador la aplicaría también a un PATCH vacío. Ver el comentario
     grande en app/core/rate_limit.py.
+
+    FEATURE (17/09/2026, pedido del cliente): la categoría tiene que ser
+    del MISMO tenant que admin_actual (404 si no, mismo criterio IDOR de
+    siempre).
     """
-    categoria = db.get(Categoria, categoria_id)
+    categoria = db.execute(
+        _con_tenant(
+            select(Categoria).where(Categoria.id == categoria_id), Categoria.tenant_id, admin_actual.tenant_id
+        )
+    ).scalar_one_or_none()
     if categoria is None:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Categoría no encontrada")
 
@@ -194,7 +248,11 @@ def delete_category(
     dependencies=[] del decorador -- ver app/core/rate_limit.py.
     """
     verificar_password_admin(confirmacion.password_actual, admin_actual, request)
-    categoria = db.get(Categoria, categoria_id)
+    categoria = db.execute(
+        _con_tenant(
+            select(Categoria).where(Categoria.id == categoria_id), Categoria.tenant_id, admin_actual.tenant_id
+        )
+    ).scalar_one_or_none()
     if categoria is None:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Categoría no encontrada")
     db.delete(categoria)

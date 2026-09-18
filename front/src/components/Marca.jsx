@@ -18,7 +18,7 @@ export function IconoMarca(props) {
   );
 }
 
-// Isotipo + texto "LT Informática" (mismo patrón de dos tonos que la
+// Isotipo + texto "NovaByte" (mismo patrón de dos tonos que la
 // referencia "TECH DIRECT": primera palabra en un tono neutro, segunda en
 // el naranja de marca). `size` controla el alto del ícono en px.
 export default function Marca({ size = 56, className = "" }) {

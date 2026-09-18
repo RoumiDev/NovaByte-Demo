@@ -15,7 +15,7 @@ from fastapi import APIRouter, Depends, HTTPException, status
 
 from app.core.database import get_db
 from app.core.pagination import Limit, Skip
-from app.dependencies.auth import get_current_user, require_admin, require_admin_o_ayudante
+from app.dependencies.auth import bloquear_en_demo, get_current_user, require_admin, require_admin_o_ayudante
 from app.models.order import EstadoOrden, Pedido, PedidoDetalle
 from app.models.product import Producto
 from app.models.user import Usuario
@@ -34,6 +34,20 @@ _TRANSICIONES_VALIDAS: dict[EstadoOrden, set[EstadoOrden]] = {
     EstadoOrden.enviado: set(),
     EstadoOrden.cancelado: set(),
 }
+
+
+def _mismo_tenant_o_produccion(current_user: Usuario, pedido: Pedido) -> bool:
+    """FEATURE (17/09/2026, pedido del cliente): "accesos temporales a la
+    demo" -- un admin/ayudante de la tienda REAL (tenant_id None) sigue
+    pudiendo ver cualquier pedido, como siempre; un admin de un tenant demo
+    sólo los de SU MISMO tenant. Sin este chequeo, get_order/
+    crear_pago_pedido/verificar_pago_pedido de acá abajo dejarían que un
+    admin demo viera CUALQUIER pedido real adivinando su id, aunque
+    list_all_orders (el listado completo) esté bloqueado para demo -- ver
+    bloquear_en_demo en app/dependencies/auth.py."""
+    if current_user.tenant_id is None:
+        return True
+    return pedido.usuario is not None and pedido.usuario.tenant_id == current_user.tenant_id
 
 
 def _pedido_query():
@@ -56,6 +70,14 @@ def create_order(
     pedido completo (no se dejan líneas "a medias"). El stock se descuenta
     con un UPDATE atómico condicionado (WHERE stock >= cantidad), así dos
     checkouts concurrentes no pueden sobrevender el mismo producto.
+
+    FEATURE (17/09/2026, pedido del cliente): "accesos temporales a la
+    demo" -- current_user.tenant_id filtra qué productos son válidos para
+    este checkout (ver más abajo) y queda grabado en el pedido mismo (ver
+    Pedido.tenant_id, app/models/order.py). Sin ese filtro, un admin demo
+    podría pasar por caja con ids de productos REALES adivinados y
+    descontarles stock de verdad -- el mismo motivo por el que list_products
+    (router/products.py) nunca mezcla los dos catálogos.
     """
     # Agrupar cantidades por producto: si el cliente repite el mismo
     # producto en dos líneas, un solo UPDATE atómico por producto evita que
@@ -67,10 +89,13 @@ def create_order(
             cantidades_por_producto.get(linea.producto_id, 0) + linea.cantidad
         )
 
+    _filtro_tenant_producto = (
+        Producto.tenant_id.is_(None) if current_user.tenant_id is None else Producto.tenant_id == current_user.tenant_id
+    )
     productos = {
         p.id: p
         for p in db.execute(
-            select(Producto).where(Producto.id.in_(cantidades_por_producto.keys()))
+            select(Producto).where(Producto.id.in_(cantidades_por_producto.keys()), _filtro_tenant_producto)
         ).scalars()
     }
 
@@ -87,7 +112,12 @@ def create_order(
             detail=f"Producto(s) no disponible(s): {inactivos}",
         )
 
-    pedido = Pedido(usuario_id=current_user.id, tipo_factura=body.tipo_factura, total_pedido=Decimal("0.00"))
+    pedido = Pedido(
+        usuario_id=current_user.id,
+        tipo_factura=body.tipo_factura,
+        total_pedido=Decimal("0.00"),
+        tenant_id=current_user.tenant_id,
+    )
     db.add(pedido)
     db.flush()  # asigna pedido.id sin cerrar todavía la transacción
 
@@ -142,7 +172,11 @@ def list_my_orders(
     return list(db.execute(query).scalars())
 
 
-@router.get("/todos", response_model=PedidoAdminListado, dependencies=[Depends(require_admin_o_ayudante)])
+@router.get(
+    "/todos",
+    response_model=PedidoAdminListado,
+    dependencies=[Depends(require_admin_o_ayudante), Depends(bloquear_en_demo)],
+)
 def list_all_orders(
     skip: Skip = 0,
     limit: Limit = 50,
@@ -191,9 +225,12 @@ def get_order(
     esta ruta no sirva para confirmar por descarte qué IDs de pedido existen
     (protección IDOR/BOLA, ver hallazgo H-10 del informe de auditoría original).
     """
-    pedido = db.execute(_pedido_query().where(Pedido.id == pedido_id)).scalar_one_or_none()
+    pedido = db.execute(
+        _pedido_query().options(selectinload(Pedido.usuario)).where(Pedido.id == pedido_id)
+    ).scalar_one_or_none()
     if pedido is None or (
-        pedido.usuario_id != current_user.id and current_user.role not in ("admin", "ayudante")
+        pedido.usuario_id != current_user.id
+        and (current_user.role not in ("admin", "ayudante") or not _mismo_tenant_o_produccion(current_user, pedido))
     ):
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Pedido no encontrado")
     return pedido
@@ -217,10 +254,13 @@ def crear_pago_pedido(
     """
     pedido = db.execute(
         select(Pedido)
-        .options(selectinload(Pedido.detalles).selectinload(PedidoDetalle.producto))
+        .options(selectinload(Pedido.detalles).selectinload(PedidoDetalle.producto), selectinload(Pedido.usuario))
         .where(Pedido.id == pedido_id)
     ).scalar_one_or_none()
-    if pedido is None or (pedido.usuario_id != current_user.id and current_user.role != "admin"):
+    if pedido is None or (
+        pedido.usuario_id != current_user.id
+        and (current_user.role != "admin" or not _mismo_tenant_o_produccion(current_user, pedido))
+    ):
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Pedido no encontrado")
 
     if pedido.estado != EstadoOrden.pendiente:
@@ -264,8 +304,13 @@ def verificar_pago_pedido(
     Mismo criterio IDOR que get_order y crear_pago_pedido: 404 (no 403) si
     el pedido es de otro usuario.
     """
-    pedido = db.execute(_pedido_query().where(Pedido.id == pedido_id)).scalar_one_or_none()
-    if pedido is None or (pedido.usuario_id != current_user.id and current_user.role != "admin"):
+    pedido = db.execute(
+        _pedido_query().options(selectinload(Pedido.usuario)).where(Pedido.id == pedido_id)
+    ).scalar_one_or_none()
+    if pedido is None or (
+        pedido.usuario_id != current_user.id
+        and (current_user.role != "admin" or not _mismo_tenant_o_produccion(current_user, pedido))
+    ):
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Pedido no encontrado")
 
     if pedido.estado != EstadoOrden.pendiente:
@@ -295,7 +340,11 @@ def verificar_pago_pedido(
     return pedido
 
 
-@router.patch("/{pedido_id}/estado", response_model=PedidoRead, dependencies=[Depends(require_admin)])
+@router.patch(
+    "/{pedido_id}/estado",
+    response_model=PedidoRead,
+    dependencies=[Depends(require_admin), Depends(bloquear_en_demo)],
+)
 def update_order_status(pedido_id: int, body: PedidoEstadoUpdate, db: Session = Depends(get_db)) -> Pedido:
     """Cambiar el estado de un pedido (administración/pago). Valida que la
     transición sea válida y repone stock automáticamente si se cancela.

@@ -110,6 +110,22 @@ class Usuario(Base):
     # comprador normal. Reemplaza al viejo campo booleano is_admin
     # (todo-o-nada) por estos tres niveles.
     role = Column(String, nullable=False, default="cliente")
+
+    # FEATURE (17/09/2026, pedido del cliente): "accesos temporales a la
+    # demo, aislados entre visitantes" -- NULL para toda cuenta real de la
+    # tienda (el caso de siempre). Cuando no es NULL, esta cuenta pertenece
+    # a un acceso temporal de demo (ver app/models/demo.py) creado por
+    # back/scripts/crear_acceso_demo.py: get_current_user (app/dependencies/
+    # auth.py) corta el acceso apenas vence ese tenant, y get_tenant_scope
+    # (mismo archivo) es quien usa este valor para que esta cuenta sólo vea
+    # los productos/categorías/pedidos de SU MISMO tenant, nunca los de la
+    # tienda real ni los de otro visitante. ondelete="CASCADE": al vencer y
+    # borrarse el DemoTenant (limpieza diaria, ver app/router/demo.py), esta
+    # cuenta se borra sola, no queda huérfana.
+    tenant_id = Column(
+        Integer, ForeignKey("demo_tenants.id", ondelete="CASCADE"), nullable=True, index=True
+    )
+
     created_at = Column(DateTime(timezone=True), server_default=func.now())
     # False al registrarse -- se pone en True cuando confirma el código de
     # 6 dígitos que se le manda por mail (ver POST /users/verificar-email).

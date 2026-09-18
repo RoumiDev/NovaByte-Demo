@@ -19,7 +19,7 @@ from app.core.rate_limit import (
     password_change_rate_limiter,
     register_rate_limiter,
 )
-from app.dependencies.auth import get_current_user, require_admin, verificar_password_admin
+from app.dependencies.auth import bloquear_en_demo, get_current_user, require_admin, verificar_password_admin
 from app.models.user import PropositoCodigo, Usuario
 from app.schemas.user import (
     ConfirmarCambioEmail,
@@ -420,7 +420,11 @@ def reset_password(body: RestablecerPassword, db: Session = Depends(get_db)) -> 
     return None
 
 
-@router.get("/", response_model=list[UsuarioRead], dependencies=[Depends(require_admin)])
+@router.get(
+    "/",
+    response_model=list[UsuarioRead],
+    dependencies=[Depends(require_admin), Depends(bloquear_en_demo)],
+)
 def list_users(
     skip: Skip = 0,
     limit: Limit = 20,
@@ -447,7 +451,11 @@ def list_users(
     return list(db.execute(query).scalars())
 
 
-@router.get("/{usuario_id}", response_model=UsuarioRead, dependencies=[Depends(require_admin)])
+@router.get(
+    "/{usuario_id}",
+    response_model=UsuarioRead,
+    dependencies=[Depends(require_admin), Depends(bloquear_en_demo)],
+)
 def get_user(usuario_id: int, db: Session = Depends(get_db)) -> Usuario:
     """Obtener un usuario por id (solo administradores)."""
     usuario = db.get(Usuario, usuario_id)
@@ -456,7 +464,7 @@ def get_user(usuario_id: int, db: Session = Depends(get_db)) -> Usuario:
     return usuario
 
 
-@router.patch("/{usuario_id}", response_model=UsuarioRead)
+@router.patch("/{usuario_id}", response_model=UsuarioRead, dependencies=[Depends(bloquear_en_demo)])
 def admin_update_user(
     usuario_id: int,
     body: UsuarioAdminUpdate,
@@ -583,6 +591,7 @@ def admin_update_user(
 @router.post(
     "/{usuario_id}/restablecer-password-admin",
     status_code=status.HTTP_204_NO_CONTENT,
+    dependencies=[Depends(bloquear_en_demo)],
 )
 def admin_reset_password(
     usuario_id: int,
@@ -691,6 +700,7 @@ def admin_reset_password(
 @router.post(
     "/{usuario_id}/marcar-email-verificado",
     response_model=UsuarioRead,
+    dependencies=[Depends(bloquear_en_demo)],
 )
 def admin_mark_email_verified(
     usuario_id: int,

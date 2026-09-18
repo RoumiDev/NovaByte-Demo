@@ -155,7 +155,7 @@ export default function SiteNavbar() {
   return (
     <Navbar bg="dark" variant="dark" expand="sm" className="px-3 mb-4">
       <Navbar.Brand as={NavLink} to="/">
-        LT Informática
+        NovaByte
       </Navbar.Brand>
       <Navbar.Toggle aria-controls="site-navbar-nav" />
       <Navbar.Collapse id="site-navbar-nav">

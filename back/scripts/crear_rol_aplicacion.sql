@@ -26,8 +26,8 @@
 -- ============================================================================
 
 -- COMPLETAR (1 de 3): nombre del rol NUEVO, sin privilegios especiales.
--- Cualquier nombre sirve, por ejemplo "lti_app".
-\set rol_nuevo lti_app
+-- Cualquier nombre sirve, por ejemplo "novabyte_app".
+\set rol_nuevo novabyte_app
 
 -- COMPLETAR (2 de 3): contraseña del rol nuevo. Generá una larga y
 -- aleatoria (no una palabra con números atrás, ese fue justamente el
@@ -38,7 +38,7 @@
 -- COMPLETAR (3 de 3): nombre de la base de datos de esta app (el mismo
 -- que aparece al final de tu DATABASE_URL actual, después de la última
 -- "/").
-\set nombre_base lti_informatica
+\set nombre_base novabyte_demo
 
 
 -- ----------------------------------------------------------------------------
@@ -109,7 +109,7 @@ ALTER SCHEMA public OWNER TO :rol_nuevo;
 --
 -- Reemplazá el usuario y la password por los del rol nuevo (el que
 -- pusiste en :rol_nuevo / :password_nuevo más arriba). Por ejemplo:
---   DATABASE_URL=postgresql+psycopg2://lti_app:PEGAR_ACA_UNA_CONTRASEÑA_LARGA_Y_ALEATORIA@localhost:5432/lti_informatica
+--   DATABASE_URL=postgresql+psycopg2://novabyte_app:PEGAR_ACA_UNA_CONTRASEÑA_LARGA_Y_ALEATORIA@localhost:5432/novabyte_demo
 --
 -- Reiniciá el backend después de guardar el .env -- SQLAlchemy lee
 -- DATABASE_URL una sola vez, al arrancar.

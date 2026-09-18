@@ -1,6 +1,6 @@
-# LT Informática — Frontend
+# NovaByte — Frontend (demo)
 
-Frontend en React (Vite) para el backend en `../LTI_backend`. Por ahora solo
+Frontend en React (Vite) para el backend en `../back`. Por ahora solo
 tiene registro y login; el resto de la tienda (catálogo, carrito, checkout
 con Mercado Pago) todavía no está armado.
 
@@ -17,7 +17,7 @@ Revisá `.env` y ajustá `VITE_API_BASE_URL` si el backend no corre en
 ## Correr en desarrollo
 
 Con el backend ya corriendo (`uvicorn app.main:app --reload` en
-`LTI_backend`, puerto 8000):
+`back`, puerto 8000):
 
 ```
 npm run dev

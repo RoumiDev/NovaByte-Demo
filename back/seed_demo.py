@@ -13,7 +13,7 @@ Carga:
 - Un usuario 'cliente' demo con email ya verificado, para poder loguearse
   y sacar la captura de Catálogo/Carrito (rutas protegidas).
 
-Cómo correrlo (con el venv activado, desde LTI_backend, contra la base
+Cómo correrlo (con el venv activado, desde back/, contra la base
 DEMO ya migrada con alembic upgrade head):
     python seed_demo.py
 """
@@ -218,7 +218,7 @@ def main():
                 provincia=None,
                 codigo_postal="1000",
                 is_active=True,
-                role="cliente",
+                role="admin",
                 email_verificado=True,
                 debe_cambiar_password=False,
             )

@@ -64,7 +64,7 @@ def crear_preferencia(pedido: Pedido) -> dict:
             "pending": MP_PENDING_URL,
         },
         "notification_url": f"{API_PUBLIC_BASE_URL}/api/v1/pagos/webhooks/mercadopago",
-        "statement_descriptor": "LTI INFORMATICA",
+        "statement_descriptor": "NOVABYTE",
     }
 
     # "auto_return" hace que Mercado Pago redirija solo (sin que el

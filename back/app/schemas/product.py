@@ -14,6 +14,14 @@ from typing import Optional
 from pydantic import BaseModel, ConfigDict, Field, field_validator, model_validator
 
 _ALLOWED_IMAGE_SCHEMES = ("http://", "https://")
+# FIX B-03 (28/08/2026, ver comentario en front/src/utils/imagenes.js): desde
+# ese fix el backend guarda a propósito una ruta relativa propia
+# ("/static/productos/...", "/static/categorias/...") en vez de una URL
+# absoluta, para no atar la imagen a un host/puerto fijo. Este validador
+# nunca se actualizó para ese formato nuevo -- sin este prefijo, CUALQUIER
+# producto/categoría con imagen (subida desde el panel admin, o cargada por
+# seed_demo.py) rompía con un 500 al listarlo (ResponseValidationError).
+_ALLOWED_IMAGE_PATH_PREFIX = "/static/"
 _MAX_IMAGE_URL_LENGTH = 2048
 # FEATURE (09/09/2026, pedido del cliente): "elegir pesos o dólares al
 # cargar" -- valores válidos de Producto.moneda_carga, mismo criterio que
@@ -36,10 +44,11 @@ def _validar_imagen_url(value: Optional[str]) -> Optional[str]:
         return None
     if len(value) > _MAX_IMAGE_URL_LENGTH:
         raise ValueError(f"imagen_url no puede superar los {_MAX_IMAGE_URL_LENGTH} caracteres.")
-    if not value.lower().startswith(_ALLOWED_IMAGE_SCHEMES):
+    if not value.lower().startswith(_ALLOWED_IMAGE_SCHEMES) and not value.startswith(_ALLOWED_IMAGE_PATH_PREFIX):
         # Rechaza esquemas como javascript: o data: (ver hallazgo M-07 del
-        # informe de auditoría de app/models).
-        raise ValueError("imagen_url debe empezar con http:// o https://.")
+        # informe de auditoría de app/models) -- /static/ es la excepción
+        # explícita agregada acá (ver comentario en _ALLOWED_IMAGE_PATH_PREFIX).
+        raise ValueError("imagen_url debe empezar con http://, https:// o /static/.")
     return value
 
 

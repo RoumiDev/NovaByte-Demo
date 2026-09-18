@@ -11,7 +11,7 @@
 // salvo de un XSS del frontend porque nunca pasa por JavaScript. El access
 // token que sigue viviendo acá tiene vida corta (15 min) precisamente para
 // acotar el daño si se filtra.
-const STORAGE_KEY = "lti_auth_tokens";
+const STORAGE_KEY = "novabyte_auth_tokens";
 
 let tokensActuales = leerDeStorage();
 const listeners = new Set();

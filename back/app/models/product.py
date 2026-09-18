@@ -1,4 +1,4 @@
-from sqlalchemy import CheckConstraint, Column, Integer, String, Numeric, ForeignKey, DateTime, Boolean, UniqueConstraint, func, select, case, cast, null
+from sqlalchemy import CheckConstraint, Column, Index, Integer, String, Numeric, ForeignKey, DateTime, Boolean, UniqueConstraint, func, select, case, cast, null, text
 from sqlalchemy.orm import column_property, relationship
 from app.core.database import Base
 # FEATURE (09/09/2026, pedido del cliente): "precio dólar" -- ver el
@@ -153,14 +153,50 @@ _TIPO_MONTO_COSTO_UTILIDAD = Numeric(14, 2)
 
 class Categoria(Base):
     __tablename__ = "categorias"
+    # FEATURE (17/09/2026, pedido del cliente): "accesos temporales a la
+    # demo, aislados entre visitantes" -- nombre YA NO es unique=True a
+    # secas (ver el Column más abajo): con tenant_id, "Periféricos" tiene
+    # que poder existir una vez en la tienda real Y una vez por cada
+    # visitante de la demo, sin chocar entre sí. Dos índices únicos
+    # PARCIALES en vez de un UniqueConstraint(tenant_id, nombre) común:
+    # Postgres no considera duplicados dos NULL en un UniqueConstraint
+    # normal (NULLs distintos entre sí por default), así que dos categorías
+    # reales (tenant_id IS NULL) con el mismo nombre NO chocarían -- exactamente
+    # el bug que esto viene a evitar. Con un índice único filtrado por
+    # "tenant_id IS NULL" para la tienda real, y otro por "tenant_id IS NOT
+    # NULL" (sobre (tenant_id, nombre)) para cada tenant demo, cada mitad se
+    # comporta como corresponde.
+    __table_args__ = (
+        Index(
+            "uq_categorias_nombre_produccion",
+            "nombre",
+            unique=True,
+            postgresql_where=text("tenant_id IS NULL"),
+        ),
+        Index(
+            "uq_categorias_nombre_por_tenant",
+            "tenant_id",
+            "nombre",
+            unique=True,
+            postgresql_where=text("tenant_id IS NOT NULL"),
+        ),
+    )
 
     id = Column(Integer, primary_key=True, index=True)
-    nombre = Column(String, unique=True, index=True, nullable=False) # Ej: "Teclados", "Monitores"
+    nombre = Column(String, index=True, nullable=False) # Ej: "Teclados", "Monitores"
     # Reemplaza a "descripcion" (se sacó, no se usaba en ninguna pantalla):
     # la foto de la categoría para la tarjeta con imagen del menú de
     # "Catálogo" (ver POST /categorias/imagenes en router/categories.py,
     # mismo patrón que Producto.imagen_url).
     imagen_url = Column(String, nullable=True)
+    # FEATURE (17/09/2026, pedido del cliente): NULL = categoría real de la
+    # tienda (el caso de siempre). Si no es NULL, pertenece a un acceso
+    # temporal de demo (ver app/models/demo.py) -- ver el comentario grande
+    # en Usuario.tenant_id (app/models/user.py) para el detalle completo de
+    # aislamiento y borrado en cascada; es el mismo criterio acá.
+    tenant_id = Column(
+        Integer, ForeignKey("demo_tenants.id", ondelete="CASCADE"), nullable=True, index=True
+    )
 
     productos = relationship("Producto", back_populates="categoria")
 
@@ -387,6 +423,17 @@ class Producto(Base):
     # vuelve a aparecer como si fuera "nuevo", no solo el que se creó hace
     # poco.
     reabastecido_at = Column(DateTime(timezone=True), nullable=True)
+
+    # FEATURE (17/09/2026, pedido del cliente): "accesos temporales a la
+    # demo, aislados entre visitantes" -- mismo campo y mismo criterio que
+    # Categoria.tenant_id acá arriba (ver ese comentario, y el más grande
+    # todavía en Usuario.tenant_id, app/models/user.py): NULL para todo
+    # producto real de la tienda; si no, pertenece a un tenant demo
+    # puntual, y sólo ESE tenant lo ve (ver get_tenant_scope en
+    # app/dependencies/auth.py).
+    tenant_id = Column(
+        Integer, ForeignKey("demo_tenants.id", ondelete="CASCADE"), nullable=True, index=True
+    )
 
     # FEATURE (09/09/2026, pedido del cliente): "precio dólar" + "elegir
     # pesos o dólares al cargar" -- el precio final en pesos que ve el

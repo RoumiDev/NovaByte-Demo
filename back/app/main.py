@@ -18,6 +18,7 @@ from app.core.config import (
     ALLOWED_ORIGINS,
     APP_NAME,
     DEBUG,
+    EN_VERCEL,
     FRONTEND_DIST_DIR,
     STORAGE_CATEGORIAS_DIR,
     STORAGE_PRODUCTOS_DIR,
@@ -45,23 +46,48 @@ async def lifespan(app: FastAPI):
     sincrónica). Con --reload de uvicorn, cada recarga reinicia este
     lifespan limpio, así que no queda ningún scheduler duplicado corriendo.
     """
-    scheduler = BackgroundScheduler()
-    scheduler.add_job(
-        procesar_pedidos_pendientes,
-        "interval",
-        minutes=_MINUTOS_ENTRE_CORRIDAS,
-        id="procesar_pedidos_pendientes",
-        # Si una corrida todavía sigue corriendo (backlog grande) cuando
-        # tocaría la siguiente, no la superpone -- simplemente la saltea.
-        max_instances=1,
-    )
-    scheduler.start()
-    logger.info(
-        "Procesamiento automatico de pedidos pendientes iniciado (cada %s minuto(s)).",
-        _MINUTOS_ENTRE_CORRIDAS,
-    )
+    # FIX (17/09/2026, deploy en Vercel): en una función serverless no hay
+    # ningún proceso de larga vida donde este scheduler en background pueda
+    # seguir corriendo entre requests -- cada invocación puede vivir en una
+    # instancia nueva, así que un BackgroundScheduler arrancado acá se
+    # perdería (o, peor, se reiniciaría en cada cold start, disparando el
+    # mismo procesamiento en paralelo desde instancias distintas). En
+    # Vercel (ver EN_VERCEL, app/core/config.py) este job directamente NO
+    # arranca acá: la reconciliación de pedidos pendientes queda a cargo
+    # del mismo cron diario que limpia los tenants demo vencidos (ver
+    # app/router/demo.py y vercel.json) -- MUCHO menos frecuente que el
+    # "cada 1 minuto" de siempre (el plan Hobby de Vercel no permite pedirle
+    # más seguido), aceptable para una demo: no hay pagos reales de por
+    # medio (MP_ACCESS_TOKEN de la demo es un token de PRUEBA, ver
+    # DEPLOY.md), así que unos pedidos "pendiente" tardando más en
+    # confirmarse/cancelarse no tiene el impacto que tendría en la tienda
+    # real. Fuera de Vercel (desarrollo local, o un hosting con proceso
+    # persistente) el comportamiento de siempre no cambia en nada.
+    if not EN_VERCEL:
+        scheduler = BackgroundScheduler()
+        scheduler.add_job(
+            procesar_pedidos_pendientes,
+            "interval",
+            minutes=_MINUTOS_ENTRE_CORRIDAS,
+            id="procesar_pedidos_pendientes",
+            # Si una corrida todavía sigue corriendo (backlog grande) cuando
+            # tocaría la siguiente, no la superpone -- simplemente la saltea.
+            max_instances=1,
+        )
+        scheduler.start()
+        logger.info(
+            "Procesamiento automatico de pedidos pendientes iniciado (cada %s minuto(s)).",
+            _MINUTOS_ENTRE_CORRIDAS,
+        )
+    else:
+        scheduler = None
+        logger.info(
+            "Corriendo en Vercel: el procesamiento de pedidos pendientes no arranca acá, "
+            "queda a cargo del cron diario (ver app/router/demo.py)."
+        )
     yield
-    scheduler.shutdown(wait=False)
+    if scheduler is not None:
+        scheduler.shutdown(wait=False)
 
 
 # Nombres de campos que nunca deben viajar en texto plano dentro de un
@@ -193,12 +219,23 @@ mimetypes.add_type("image/webp", ".webp")
 # Sirve las imágenes de productos subidas desde el panel admin (ver
 # POST /api/v1/productos/imagenes). Montado fuera de /api/v1 a propósito:
 # no es un endpoint de la API, es contenido estático plano.
-app.mount("/static/productos", StaticFiles(directory=STORAGE_PRODUCTOS_DIR), name="productos-imagenes")
+#
+# FIX (17/09/2026, deploy en Vercel): StaticFiles revienta al construirse
+# (RuntimeError) si el directorio no existe todavía -- en Vercel
+# STORAGE_PRODUCTOS_DIR/STORAGE_CATEGORIAS_DIR (app/core/config.py) ya NO
+# se crean solas (filesystem de sólo lectura fuera de /tmp), así que sin
+# este chequeo la app ni siquiera terminaría de importar main.py ahí. En
+# Vercel las imágenes NUEVAS van a Vercel Blob (ver
+# app/services/vercel_blob.py) -- URLs absolutas, no rutas "/static/...",
+# así que estos dos mounts simplemente no hacen falta en ese caso.
+if STORAGE_PRODUCTOS_DIR.is_dir():
+    app.mount("/static/productos", StaticFiles(directory=STORAGE_PRODUCTOS_DIR), name="productos-imagenes")
 
 # Mismo criterio, para las imágenes de categoría (ver POST
 # /api/v1/categorias/imagenes) -- la tarjeta con foto por categoría del
 # menú de "Catálogo".
-app.mount("/static/categorias", StaticFiles(directory=STORAGE_CATEGORIAS_DIR), name="categorias-imagenes")
+if STORAGE_CATEGORIAS_DIR.is_dir():
+    app.mount("/static/categorias", StaticFiles(directory=STORAGE_CATEGORIAS_DIR), name="categorias-imagenes")
 
 # Servir el build del frontend (npm run build en front/) DESDE ESTA
 # MISMA API cuando la carpeta existe -- pensado para demos temporales

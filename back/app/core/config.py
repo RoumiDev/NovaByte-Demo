@@ -10,21 +10,70 @@ from dotenv import load_dotenv
 BASE_DIR = Path(__file__).resolve().parents[2]
 load_dotenv(BASE_DIR / ".env")
 
+# FEATURE (17/09/2026, deploy en Vercel): "VERCEL" es una variable que
+# Vercel setea sola (a "1") en toda función serverless suya -- no hace
+# falta cargarla a mano en ningún .env, sólo está presente ahí. Se usa acá
+# abajo para no intentar crear carpetas en un filesystem de sólo lectura
+# (ver el comentario grande de STORAGE_PRODUCTOS_DIR/STORAGE_CATEGORIAS_DIR
+# más abajo), y en app/main.py para no arrancar el scheduler en background
+# de app/jobs/reconciliacion_pagos.py (una función serverless no tiene
+# proceso persistente donde ese scheduler pueda seguir vivo entre
+# requests -- ver el comentario ahí).
+EN_VERCEL = bool(os.getenv("VERCEL"))
+
 # Carpeta donde se guardan las imágenes de productos subidas desde el panel
-# admin (ver POST /productos/imagenes). Carpeta única y plana a propósito:
-# un producto puede cambiar de categoría, así que organizar por categoría
-# obligaría a mover archivos físicos cada vez que eso pase. La carpeta se
-# crea sola si no existe -- no se versiona en git (ver .gitignore).
+# admin (ver POST /productos/imagenes) -- SOLO en desarrollo local o en un
+# hosting con disco persistente. Carpeta única y plana a propósito: un
+# producto puede cambiar de categoría, así que organizar por categoría
+# obligaría a mover archivos físicos cada vez que eso pase. No se versiona
+# en git (ver .gitignore).
+#
+# FIX (17/09/2026, deploy en Vercel): antes esto hacía
+# STORAGE_PRODUCTOS_DIR.mkdir(...) sin condición ninguna, al importar este
+# módulo -- en una función serverless de Vercel el filesystem es de sólo
+# lectura fuera de /tmp, así que ese mkdir tiraba PermissionError/OSError
+# ahí mismo, en el import, tumbando la app entera antes de poder responder
+# ni un solo request. Ahora sólo se crea la carpeta si NO estamos en Vercel
+# (ver EN_VERCEL más arriba) -- en Vercel las imágenes van a Vercel Blob en
+# cambio (ver BLOB_READ_WRITE_TOKEN más abajo y app/services/vercel_blob.py),
+# así que esta carpeta directamente no se usa ahí.
 STORAGE_PRODUCTOS_DIR = BASE_DIR / "storage" / "productos"
-STORAGE_PRODUCTOS_DIR.mkdir(parents=True, exist_ok=True)
+if not EN_VERCEL:
+    STORAGE_PRODUCTOS_DIR.mkdir(parents=True, exist_ok=True)
 
 # Carpeta donde se guardan las imágenes de categorías subidas desde el
 # panel admin (ver POST /categorias/imagenes) -- la tarjeta con foto por
 # categoría del menú de "Catálogo". Aparte de STORAGE_PRODUCTOS_DIR porque
 # es contenido distinto (una foto por categoría, no por producto); mismo
-# criterio de carpeta plana y no versionada en git.
+# criterio de carpeta plana, no versionada en git, y mismo FIX (17/09/2026)
+# de más arriba sobre por qué el mkdir es condicional.
 STORAGE_CATEGORIAS_DIR = BASE_DIR / "storage" / "categorias"
-STORAGE_CATEGORIAS_DIR.mkdir(parents=True, exist_ok=True)
+if not EN_VERCEL:
+    STORAGE_CATEGORIAS_DIR.mkdir(parents=True, exist_ok=True)
+
+# FEATURE (17/09/2026, deploy en Vercel): token del Blob store del proyecto
+# (Storage → tu store → variables de entorno, Vercel ya lo agrega solo como
+# BLOB_READ_WRITE_TOKEN al conectar un store -- ver la guía de despliegue en
+# back/DEPLOY.md). Opcional a propósito, a diferencia de MP_ACCESS_TOKEN y
+# el resto de la config sensible de más abajo: en desarrollo local
+# simplemente no se setea, y subir_imagen_producto/subir_imagen_categoria
+# (app/router/products.py y app/router/categories.py) siguen guardando en
+# disco local como siempre -- ver blob_habilitado() en
+# app/services/vercel_blob.py, que es quien decide cuál de los dos modos
+# corresponde en cada subida.
+BLOB_READ_WRITE_TOKEN = os.getenv("BLOB_READ_WRITE_TOKEN")
+
+# FEATURE (17/09/2026, pedido del cliente -- "accesos temporales a la
+# demo"): secreto compartido que valida GET /api/v1/demo/limpieza (ver
+# app/router/demo.py) contra el header Authorization que Vercel agrega
+# solo a las llamadas de su propio Cron Job cuando existe una variable de
+# entorno CRON_SECRET (ver vercel.json y la guía de despliegue en
+# back/DEPLOY.md) -- sin este chequeo, cualquiera que descubriera la URL
+# del endpoint podría dispararlo a mano en cualquier momento. Opcional acá
+# (a diferencia de SECRET_KEY): sin setear, ese endpoint simplemente
+# rechaza TODAS las llamadas (ver _verificar_secreto_cron en
+# app/router/demo.py) -- falla cerrado, nunca abierto.
+CRON_SECRET = os.getenv("CRON_SECRET")
 
 
 def _positive_int(environment_name: str, default: int) -> int:
@@ -39,7 +88,7 @@ def _positive_int(environment_name: str, default: int) -> int:
 
 
 # Configuración general.
-APP_NAME = os.getenv("APP_NAME", "E-Commerce API Informática")
+APP_NAME = os.getenv("APP_NAME", "NovaByte E-Commerce API")
 DEBUG = os.getenv("DEBUG", "False").lower() == "true"
 DATABASE_URL = os.getenv("DATABASE_URL")
 
@@ -86,7 +135,7 @@ REFRESH_COOKIE_SAMESITE = os.getenv("REFRESH_COOKIE_SAMESITE", "lax")
 # para no exigir HTTPS en desarrollo local (http://localhost).
 REFRESH_COOKIE_SECURE = os.getenv("REFRESH_COOKIE_SECURE", str(not DEBUG)).lower() == "true"
 
-# Build de producción del frontend (npm run build en LTI_frontend). Si esta
+# Build de producción del frontend (npm run build en front/). Si esta
 # carpeta existe, app/main.py sirve el frontend directamente desde ESTA API
 # (mismo origen, sin CORS ni cookies cross-site) -- pensado para demos
 # temporales con un solo túnel, NO para el despliegue real (ahí el frontend
@@ -94,7 +143,7 @@ REFRESH_COOKIE_SECURE = os.getenv("REFRESH_COOKIE_SECURE", str(not DEBUG)).lower
 # correr el build: esta app sigue funcionando igual, solo como API.
 _frontend_dist_env = os.getenv("FRONTEND_DIST_DIR", "")
 FRONTEND_DIST_DIR = (
-    Path(_frontend_dist_env) if _frontend_dist_env else BASE_DIR.parent / "LTI_frontend" / "dist"
+    Path(_frontend_dist_env) if _frontend_dist_env else BASE_DIR.parent / "front" / "dist"
 )
 
 # Usar solamente algoritmos HMAC explícitamente soportados por esta aplicación.
@@ -152,7 +201,7 @@ SMTP_HOST = os.getenv("SMTP_HOST", "smtp.gmail.com")
 SMTP_PORT = _positive_int("SMTP_PORT", 587)
 SMTP_USER = os.getenv("SMTP_USER")
 SMTP_PASSWORD = os.getenv("SMTP_PASSWORD")
-# Nombre visible como remitente (ej. "LT Informática <cuenta@gmail.com>").
+# Nombre visible como remitente (ej. "NovaByte <cuenta@gmail.com>").
 SMTP_FROM_NAME = os.getenv("SMTP_FROM_NAME", APP_NAME)
 if not SMTP_USER or not SMTP_PASSWORD:
     raise RuntimeError(

@@ -15,7 +15,7 @@ from fastapi import APIRouter, Depends, HTTPException, Request, status
 
 from app.core.database import get_db
 from app.core.rate_limit import confirmar_password_admin_rate_limiter
-from app.dependencies.auth import require_admin, verificar_password_admin
+from app.dependencies.auth import bloquear_en_demo, require_admin, verificar_password_admin
 from app.models.store import ConfiguracionTienda, MarcaDestacada
 from app.models.user import Usuario
 from app.schemas.product import ConfirmacionPassword
@@ -60,7 +60,7 @@ def get_configuracion(db: Session = Depends(get_db)) -> ConfiguracionTienda:
     return _obtener_o_crear(db)
 
 
-@router.patch("/", response_model=ConfiguracionTiendaRead)
+@router.patch("/", response_model=ConfiguracionTiendaRead, dependencies=[Depends(bloquear_en_demo)])
 def update_configuracion(
     body: ConfiguracionTiendaUpdate,
     request: Request,
@@ -138,7 +138,7 @@ def list_marcas_destacadas(db: Session = Depends(get_db)) -> list[MarcaDestacada
 @router.put(
     "/marcas-destacadas/{posicion}",
     response_model=MarcaDestacadaRead,
-    dependencies=[Depends(require_admin)],
+    dependencies=[Depends(require_admin), Depends(bloquear_en_demo)],
 )
 def set_marca_destacada(posicion: int, body: MarcaDestacadaUpdate, db: Session = Depends(get_db)) -> MarcaDestacada:
     """Carga (o reemplaza) la imagen de una posición fija, y la marca a la
@@ -173,7 +173,7 @@ def set_marca_destacada(posicion: int, body: MarcaDestacadaUpdate, db: Session =
 @router.delete(
     "/marcas-destacadas/{posicion}",
     response_model=MarcaDestacadaRead,
-    dependencies=[Depends(confirmar_password_admin_rate_limiter)],
+    dependencies=[Depends(confirmar_password_admin_rate_limiter), Depends(bloquear_en_demo)],
 )
 def eliminar_marca_destacada(
     posicion: int,

@@ -1,6 +1,6 @@
 import { createContext, useContext, useEffect, useState } from "react";
 
-const STORAGE_KEY = "lti_tema";
+const STORAGE_KEY = "novabyte_tema";
 
 function leerTemaInicial() {
   const guardado = localStorage.getItem(STORAGE_KEY);

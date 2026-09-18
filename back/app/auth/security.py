@@ -52,6 +52,16 @@ def _create_token(user: Usuario, token_type: str, lifetime_minutes: int) -> tupl
         "last_activity_at": issued_at,
         "exp": expires_at,
         "jti": token_id,
+        # FEATURE (17/09/2026, pedido del cliente): "accesos temporales a
+        # la demo, aislados entre visitantes" -- viaja en el token para que
+        # get_tenant_scope (app/dependencies/auth.py) pueda filtrar sin una
+        # consulta aparte. None para toda cuenta real (el caso de siempre).
+        # A propósito NO va en required_claims de decode_token más abajo:
+        # a diferencia del resto de los claims, None es un valor válido
+        # acá (no "faltante"), así que exigirlo con el mismo chequeo
+        # truthy que los demás rechazaría de punta cualquier token de una
+        # cuenta real.
+        "tenant_id": user.tenant_id,
     }
     return jwt.encode(claims, SECRET_KEY, algorithm=ALGORITHM), token_id, datetime.fromtimestamp(
         expires_at, timezone.utc

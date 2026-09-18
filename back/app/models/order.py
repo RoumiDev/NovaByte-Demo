@@ -32,6 +32,22 @@ class Pedido(Base):
     mp_payment_id = Column(String(64), unique=True, nullable=True, index=True)
     created_at = Column(DateTime(timezone=True), server_default=func.now())
 
+    # FEATURE (17/09/2026, pedido del cliente): "accesos temporales a la
+    # demo, aislados entre visitantes" -- se completa (create_order, ver
+    # router/orders.py) con el tenant_id del usuario que hace el pedido,
+    # tanto para poder filtrar por tenant sin tener que salir a buscarlo en
+    # usuarios (mismo criterio que Producto.tenant_id/Categoria.tenant_id),
+    # como -- más importante todavía -- para que borrar un DemoTenant
+    # vencido (ver app/models/demo.py) borre también en cascada sus
+    # pedidos: Pedido.usuario_id (acá arriba) NO tiene ondelete="CASCADE" a
+    # propósito (un pedido es un registro histórico que no debe desaparecer
+    # sólo porque la cuenta se borró), así que sin esta columna propia,
+    # borrar el Usuario de un tenant vencido fallaría por violar esa FK
+    # mientras sus pedidos todavía existieran.
+    tenant_id = Column(
+        Integer, ForeignKey("demo_tenants.id", ondelete="CASCADE"), nullable=True, index=True
+    )
+
     usuario = relationship("Usuario", back_populates="pedidos")
     detalles = relationship("PedidoDetalle", back_populates="pedido", cascade="all, delete-orphan")
 
